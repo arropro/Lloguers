@@ -1,0 +1,17 @@
+{
+  "name": "lloguers",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  // La base de dades (D1) i l'espai per als fitxers (KV) es creen sols el primer cop que es publica.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "lloguers" }
+  ],
+  "kv_namespaces": [
+    { "binding": "BLOBS" }
+  ]
+}

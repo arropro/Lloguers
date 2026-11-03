@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B1430">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon-192.png">
+<title>Còpia de seguretat · Lloguers</title>
+<style>
+:root{--bg:#F4F6FB;--card:#fff;--ink:#141B33;--muted:#5E6B8C;--line:#E2E7F2;--gold:#FFC23D;--night:#0B1430;--ok:#1E8E5A;--bad:#C2412D}
+@media (prefers-color-scheme:dark){:root{--bg:#0B1020;--card:#141B33;--ink:#E8EDFB;--muted:#9FB0DD;--line:#26304F}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.45}
+header{background:var(--night);color:#E8EDFB;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 12px;display:flex;align-items:center;gap:12px;position:sticky;top:0}
+header a{color:inherit;text-decoration:none;font-size:22px;line-height:1;padding:4px 8px 4px 0}header b{font-size:16px}
+main{max-width:620px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:14px}
+h2{font-size:17px;margin:0 0 6px}p{margin:0 0 12px;color:var(--muted);font-size:14px}
+button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 16px;font-weight:700;font-size:15px;cursor:pointer;background:var(--gold);color:#1a1300;width:100%}
+button.sec{background:transparent;border:1px solid var(--line);color:var(--ink)}
+button:disabled{opacity:.5;cursor:default}
+input[type=file]{display:none}
+.st{font-size:14px;margin-top:10px;min-height:1.2em;color:var(--muted)}.st.ok{color:var(--ok)}.st.bad{color:var(--bad)}
+.bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:10px;display:none}.bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.kv{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}.kv:last-child{border:0}
+</style>
+</head>
+<body>
+<header><a href="/" aria-label="Tornar">‹</a><b>Còpia de seguretat</b></header>
+<main>
+  <div class="card">
+    <h2>Les teves dades</h2>
+    <div id="counts"><p>Carregant…</p></div>
+  </div>
+  <div class="card">
+    <h2>Descarregar una còpia</h2>
+    <p>Un fitxer .zip amb tots els pisos, contractes, moviments i documents. Guarda'l en un lloc segur de tant en tant.</p>
+    <button id="exp">Descarregar còpia</button>
+    <div class="bar" id="exp-bar"><i></i></div><div class="st" id="exp-st"></div>
+  </div>
+  <div class="card">
+    <h2>Recuperar una còpia</h2>
+    <p>Tria un fitxer de còpia (.zip). Les dades de la còpia s'afegeixen a les que ja tens; si alguna ja hi és, es substitueix per la de la còpia. No s'esborra res.</p>
+    <label><input type="file" id="imp-file" accept=".zip,application/zip"><span class="btn" id="imp-btn" role="button" tabindex="0">Triar fitxer de còpia</span></label>
+    <div class="bar" id="imp-bar"><i></i></div><div class="st" id="imp-st"></div>
+  </div>
+  <div class="card">
+    <h2>Escaneig amb IA</h2>
+    <div id="ai"><p>Carregant…</p></div>
+  </div>
+  <div class="card">
+    <button class="sec" id="logout">Tancar la sessió en aquest aparell</button>
+  </div>
+</main>
+<script src="/jszip.min.js"></script>
+<script>
+"use strict";
+const COLS = ["props", "contracts", "moves", "docs", "inbox"];
+const NAMES = { props: "Pisos", contracts: "Contractes", moves: "Moviments", docs: "Documents desats", inbox: "Pendents de revisar" };
+const $ = s => document.querySelector(s);
+async function api(method, path, body, headers) {
+  const r = await fetch(path, { method, credentials: "same-origin", headers: headers || (body !== undefined ? { "content-type": "application/json" } : undefined), body: body === undefined ? undefined : headers ? body : JSON.stringify(body) });
+  if (r.status === 401) { location.href = "/"; throw new Error("sessió"); }
+  const d = await r.json().catch(() => null);
+  if (!r.ok) throw new Error((d && d.error && (d.error.message || d.error.code)) || ("Error " + r.status));
+  return d;
+}
+const st = (el, t, cls) => { el.textContent = t; el.className = "st" + (cls ? " " + cls : ""); };
+const bar = (el, f) => { el.style.display = f == null ? "none" : "block"; el.firstElementChild.style.width = Math.round((f || 0) * 100) + "%"; };
+const mb = n => (n / 1048576).toFixed(1).replace(".", ",") + " MB";
+
+async function counts() {
+  try {
+    const out = [];
+    for (const c of COLS) { const r = await api("GET", "/api/db/" + c); out.push(`<div class="kv"><span>${NAMES[c]}</span><b>${r.docs.length}</b></div>`); }
+    const b = await api("GET", "/api/blobs");
+    out.push(`<div class="kv"><span>Fitxers (fotos i PDF)</span><b>${b.blobs.length} · ${mb(b.blobs.reduce((s, x) => s + x.size, 0))}</b></div>`);
+    $("#counts").innerHTML = out.join("");
+  } catch (e) { $("#counts").innerHTML = `<p>No s'han pogut llegir: ${e.message}</p>`; }
+  try {
+    const u = await api("GET", "/api/ai/usage");
+    const m = new Date().toISOString().slice(0, 7), row = (u.usage || []).find(x => x.month === m);
+    $("#ai").innerHTML = `<div class="kv"><span>Documents llegits aquest mes</span><b>${row ? row.calls : 0}</b></div><div class="kv"><span>Model</span><b>${u.model}</b></div><p style="margin-top:10px">El cost exacte el pots veure a la consola d'Anthropic (console.anthropic.com).</p>`;
+  } catch { $("#ai").innerHTML = "<p>—</p>"; }
+}
+
+$("#exp").onclick = async () => {
+  const btn = $("#exp"), s = $("#exp-st"), b = $("#exp-bar"); btn.disabled = true; st(s, "Preparant la còpia…");
+  try {
+    const zip = new JSZip(), data = {};
+    for (const c of COLS) data[c] = (await api("GET", "/api/db/" + c)).docs.map(x => ({ id: x.id, ...x.data }));
+    zip.file("data.json", JSON.stringify(data, null, 1));
+    const list = (await api("GET", "/api/blobs")).blobs;
+    zip.file("blobs.json", JSON.stringify(list.map(x => ({ id: x.id, type: x.type }))));
+    let i = 0;
+    for (const x of list) {
+      const r = await fetch("/_blob/" + encodeURIComponent(x.id), { credentials: "same-origin" });
+      if (r.ok) zip.file("blobs/" + x.id, await r.arrayBuffer());
+      bar(b, ++i / Math.max(1, list.length)); st(s, `Documents: ${i} de ${list.length}`);
+    }
+    st(s, "Comprimint…");
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "lloguers-copia-" + new Date().toISOString().slice(0, 10) + ".zip"; document.body.appendChild(a); a.click(); a.remove();
+    st(s, "Còpia descarregada (" + mb(blob.size) + ").", "ok");
+  } catch (e) { st(s, "No s'ha pogut fer la còpia: " + e.message, "bad"); }
+  bar(b, null); btn.disabled = false;
+};
+
+$("#imp-btn").onkeydown = e => { if (e.key === "Enter" || e.key === " ") $("#imp-file").click(); };
+$("#imp-file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const s = $("#imp-st"), b = $("#imp-bar");
+  try {
+    st(s, "Obrint la còpia…");
+    const zip = await JSZip.loadAsync(f);
+    const dj = zip.file("data.json"); if (!dj) throw new Error("aquest fitxer no és una còpia de l'app");
+    const data = JSON.parse(await dj.async("string"));
+    const bl = zip.file("blobs.json") ? JSON.parse(await zip.file("blobs.json").async("string")) : [];
+    const total = COLS.reduce((n, c) => n + (data[c] || []).length, 0) + bl.length;
+    if (!confirm(`Recuperar ${total} elements de la còpia? Les dades que ja tens es mantenen.`)) { st(s, ""); return; }
+    let done = 0, fails = 0;
+    for (const x of bl) {
+      const file = zip.file("blobs/" + x.id);
+      if (file) { try { await api("POST", "/api/blob?id=" + encodeURIComponent(x.id), await file.async("blob"), { "content-type": x.type || "application/octet-stream" }); } catch { fails++; } }
+      bar(b, ++done / total); st(s, `Recuperant documents… ${done} de ${total}`);
+    }
+    for (const c of COLS) for (const d of data[c] || []) {
+      const { id, ...rest } = d;
+      try { await api("PUT", "/api/db/" + c + "/" + encodeURIComponent(id), { data: rest }); } catch { fails++; }
+      bar(b, ++done / total); st(s, `Recuperant dades… ${done} de ${total}`);
+    }
+    st(s, fails ? `Fet, però ${fails} elements no s'han pogut recuperar. Torna-ho a provar amb el mateix fitxer.` : "Còpia recuperada. Ja pots tornar a l'app.", fails ? "bad" : "ok");
+    counts();
+  } catch (err) { st(s, "No s'ha pogut recuperar: " + err.message, "bad"); }
+  bar(b, null);
+};
+$("#logout").onclick = async () => { await api("POST", "/api/logout").catch(() => {}); location.href = "/"; };
+counts();
+</script>
+</body>
+</html>
