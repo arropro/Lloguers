@@ -44,8 +44,27 @@ head = """<!doctype html>
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script src="/shim.js"></script>
+<style>
+#splash{position:fixed;inset:0;z-index:9999;background:#0B1430;transition:opacity .5s ease}
+#splash img{width:100%;height:100%;object-fit:cover;display:block}
+#splash.hide{opacity:0;pointer-events:none}
+</style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><picture><source media="(orientation: landscape)" srcset="/splash-wide.jpg"><img src="/splash.jpg" alt=""></picture></div>
+<script>
+(function () {
+  // Pantalla d'inici: la imatge de la icona a pantalla completa uns instants en obrir l'app.
+  var s = document.getElementById("splash"), seen = false;
+  try { seen = sessionStorage.getItem("lloguers-splash") === "1"; sessionStorage.setItem("lloguers-splash", "1"); } catch (e) {}
+  if (seen) { s.remove(); return; }
+  var t0 = Date.now(), done = false;
+  function hide() { if (done) return; done = true; s.classList.add("hide"); setTimeout(function () { s.remove(); }, 600); }
+  s.addEventListener("click", hide);
+  window.addEventListener("load", function () { setTimeout(hide, Math.max(0, 1600 - (Date.now() - t0))); });
+  setTimeout(hide, 4000);
+})();
+</script>
 """
 out = head + src + "\n</body>\n</html>\n"
 pathlib.Path(__file__).with_name("public").joinpath("index.html").write_text(out, encoding="utf-8")

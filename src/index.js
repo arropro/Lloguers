@@ -149,7 +149,7 @@ const PUBLIC_PATHS = new Set(["/sw.js"]);
 // ---------- icona de l'app (es pot canviar des de "Còpia de seguretat") ----------
 const ICONS = ["skyline", "empire-dia", "empire-capvespre", "edifici"];
 const DEFAULT_ICON = "skyline";
-const ICON_FILES = { "/icon-512.png": "512", "/icon-192.png": "192", "/apple-touch-icon.png": "180", "/favicon.ico": "48" };
+const ICON_FILES = { "/icon-512.png": "512.png", "/icon-192.png": "192.png", "/apple-touch-icon.png": "180.png", "/favicon.ico": "48.png", "/splash.jpg": "splash.jpg", "/splash-wide.jpg": "wide.jpg" };
 async function currentIcon(env) {
   try { const r = await env.DB.prepare("SELECT v FROM settings WHERE k = 'icon'").first(); if (r && ICONS.includes(r.v)) return r.v; } catch {}
   return DEFAULT_ICON;
@@ -261,8 +261,9 @@ export default {
       if (ICON_FILES[p] || p === "/manifest.webmanifest") {
         const icon = await currentIcon(env);
         if (p === "/manifest.webmanifest") return new Response(manifest(icon), { headers: { "content-type": "application/manifest+json", "cache-control": "no-cache" } });
-        const r = await env.ASSETS.fetch(new Request(url.origin + "/icons/" + icon + "-" + ICON_FILES[p] + ".png"));
-        return new Response(r.body, { status: r.status, headers: { "content-type": "image/png", "cache-control": "no-cache" } });
+        const f = ICON_FILES[p];
+        const r = await env.ASSETS.fetch(new Request(url.origin + "/icons/" + icon + "-" + f));
+        return new Response(r.body, { status: r.status, headers: { "content-type": f.endsWith(".jpg") ? "image/jpeg" : "image/png", "cache-control": "no-cache" } });
       }
       if (p === "/api/login" && request.method === "POST") return await login(request, env);
       if (p === "/login") return html(LOGIN_HTML());
