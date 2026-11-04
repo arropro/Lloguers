@@ -22,6 +22,7 @@ button:disabled{opacity:.5;cursor:default}
 input[type=file]{display:none}
 .st{font-size:14px;margin-top:10px;min-height:1.2em;color:var(--muted)}.st.ok{color:var(--ok)}.st.bad{color:var(--bad)}
 .bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:10px;display:none}.bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+.icons{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.icons button{padding:0;background:none;border:3px solid transparent;border-radius:22%;overflow:hidden;aspect-ratio:1;width:100%}.icons button.on{border-color:var(--gold)}.icons img{width:100%;height:100%;display:block}
 .kv{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}.kv:last-child{border:0}
 </style>
 </head>
@@ -43,6 +44,12 @@ input[type=file]{display:none}
     <p>Tria un fitxer de còpia (.zip). Les dades de la còpia s'afegeixen a les que ja tens; si alguna ja hi és, es substitueix per la de la còpia. No s'esborra res.</p>
     <label><input type="file" id="imp-file" accept=".zip,application/zip"><span class="btn" id="imp-btn" role="button" tabindex="0">Triar fitxer de còpia</span></label>
     <div class="bar" id="imp-bar"><i></i></div><div class="st" id="imp-st"></div>
+  </div>
+  <div class="card">
+    <h2>Icona de l'app</h2>
+    <p>Tria la icona. Per veure-la canviada al mòbil, esborra l'app de la pantalla d'inici i torna-la a instal·lar.</p>
+    <div class="icons" id="icons"></div>
+    <div class="st" id="ic-st"></div>
   </div>
   <div class="card">
     <h2>Escaneig amb IA</h2>
@@ -136,7 +143,19 @@ $("#imp-file").onchange = async e => {
   bar(b, null);
 };
 $("#logout").onclick = async () => { await api("POST", "/api/logout").catch(() => {}); location.href = "/"; };
-counts();
+async function icons() {
+  try {
+    const r = await api("GET", "/api/settings");
+    const names = { "skyline": "Skyline de nit", "empire-dia": "Empire State de dia", "empire-capvespre": "Empire State al capvespre", "edifici": "Edifici dibuixat" };
+    $("#icons").innerHTML = r.icons.map(k => `<button type="button" data-ic="${k}" class="${k === r.icon ? "on" : ""}" title="${names[k] || k}" aria-label="${names[k] || k}"><img src="/icons/${k}-192.png" alt=""></button>`).join("");
+    $("#icons").onclick = async e => {
+      const b = e.target.closest("[data-ic]"); if (!b) return;
+      try { await api("POST", "/api/settings", { icon: b.dataset.ic }); document.querySelectorAll("#icons button").forEach(x => x.classList.toggle("on", x === b)); st($("#ic-st"), "Icona canviada.", "ok"); }
+      catch (err) { st($("#ic-st"), "No s'ha pogut canviar: " + err.message, "bad"); }
+    };
+  } catch { $("#icons").innerHTML = "<p>—</p>"; }
+}
+counts(); icons();
 </script>
 </body>
 </html>

@@ -49,6 +49,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS docs (col TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, updated INTEGER NOT NULL, PRIMARY KEY (col, id))"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, type TEXT NOT NULL, size INTEGER NOT NULL, created INTEGER NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS login_fail (ip TEXT NOT NULL, ts INTEGER NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS ai_usage (month TEXT PRIMARY KEY, calls INTEGER NOT NULL, input INTEGER NOT NULL, output INTEGER NOT NULL)"),
   ]);
   schemaReady = true;
@@ -143,7 +144,28 @@ button{margin-top:12px;width:100%;padding:14px;border:0;border-radius:14px;backg
 <input type="password" name="password" autocomplete="current-password" placeholder="Contrasenya" required autofocus><button>Entrar</button><div class="e">${msg}</div></form></body></html>`;
 const html = (s, status = 200) => new Response(s, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 
-const PUBLIC_PATHS = new Set(["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png", "/favicon.ico", "/sw.js"]);
+const PUBLIC_PATHS = new Set(["/sw.js"]);
+
+// ---------- icona de l'app (es pot canviar des de "Còpia de seguretat") ----------
+const ICONS = ["skyline", "empire-dia", "empire-capvespre", "edifici"];
+const DEFAULT_ICON = "skyline";
+const ICON_FILES = { "/icon-512.png": "512", "/icon-192.png": "192", "/apple-touch-icon.png": "180", "/favicon.ico": "48" };
+async function currentIcon(env) {
+  try { const r = await env.DB.prepare("SELECT v FROM settings WHERE k = 'icon'").first(); if (r && ICONS.includes(r.v)) return r.v; } catch {}
+  return DEFAULT_ICON;
+}
+function manifest(icon) {
+  const v = "?i=" + icon;
+  return JSON.stringify({
+    name: "Els meus lloguers", short_name: "Lloguers", description: "Gestió dels meus pisos de lloguer", lang: "ca",
+    id: "/", start_url: "/", scope: "/", display: "standalone", background_color: "#0B1430", theme_color: "#0B1430",
+    icons: [
+      { src: "/icon-192.png" + v, sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png" + v, sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png" + v, sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
+  });
+}
 
 async function login(request, env) {
   const ip = request.headers.get("cf-connecting-ip") || "?";
@@ -217,6 +239,13 @@ async function api(request, env, url) {
     const { results } = await env.DB.prepare("SELECT * FROM ai_usage ORDER BY month DESC LIMIT 12").all();
     return json({ usage: results, model: env.AI_MODEL || DEFAULT_MODEL });
   }
+  if (p === "/api/settings" && m === "GET") return json({ icon: await currentIcon(env), icons: ICONS });
+  if (p === "/api/settings" && m === "POST") {
+    const body = await request.json().catch(() => null);
+    if (!body || !ICONS.includes(body.icon)) return err("invalid_request", 400);
+    await env.DB.prepare("INSERT INTO settings (k, v) VALUES ('icon', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(body.icon).run();
+    return json({ icon: body.icon });
+  }
   if (p === "/api/logout" && m === "POST") return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
   return err("not_found", 404);
 }
@@ -229,6 +258,12 @@ export default {
     if (PUBLIC_PATHS.has(p)) return env.ASSETS.fetch(request);
     try {
       await ensureSchema(env);
+      if (ICON_FILES[p] || p === "/manifest.webmanifest") {
+        const icon = await currentIcon(env);
+        if (p === "/manifest.webmanifest") return new Response(manifest(icon), { headers: { "content-type": "application/manifest+json", "cache-control": "no-cache" } });
+        const r = await env.ASSETS.fetch(new Request(url.origin + "/icons/" + icon + "-" + ICON_FILES[p] + ".png"));
+        return new Response(r.body, { status: r.status, headers: { "content-type": "image/png", "cache-control": "no-cache" } });
+      }
       if (p === "/api/login" && request.method === "POST") return await login(request, env);
       if (p === "/login") return html(LOGIN_HTML());
       const ok = await isLoggedIn(request, env);
