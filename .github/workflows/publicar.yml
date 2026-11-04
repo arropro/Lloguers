@@ -1,0 +1,27 @@
+# Cada canvi que es puja aquí (GitHub) es copia a GitLab, i Cloudflare el publica sol des d'allà.
+name: Publicar l'app
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+jobs:
+  copiar-a-gitlab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: origen
+      - name: Copiar el codi a GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then echo "Falta el secret GITLAB_TOKEN"; exit 1; fi
+          git clone "https://oauth2:${GITLAB_TOKEN}@gitlab.com/marc.sportsmatch.pro/lloguers.git" desti
+          rsync -a --delete --exclude .git --exclude .github origen/ desti/
+          cd desti
+          git config user.name "publicar-app"
+          git config user.email "publicar-app@users.noreply.gitlab.com"
+          git add -A
+          if git diff --cached --quiet; then echo "No hi ha canvis per publicar"; exit 0; fi
+          git commit -m "Canvis des de GitHub (${GITHUB_SHA::7})"
+          git push origin HEAD
