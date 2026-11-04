@@ -149,6 +149,8 @@ const PUBLIC_PATHS = new Set(["/sw.js"]);
 // ---------- icona de l'app (es pot canviar des de "Còpia de seguretat") ----------
 const ICONS = ["skyline", "empire-dia", "empire-capvespre", "edifici"];
 const DEFAULT_ICON = "skyline";
+// Color de fons de cada icona (el fa servir Android a la pantalla que surt just en obrir l'app).
+const ICON_BG = { "skyline": "#384250", "empire-dia": "#8A7272", "empire-capvespre": "#4B5156", "edifici": "#0B1430" };
 const ICON_FILES = { "/icon-512.png": "512.png", "/icon-192.png": "192.png", "/apple-touch-icon.png": "180.png", "/favicon.ico": "48.png", "/splash.jpg": "splash.jpg", "/splash-wide.jpg": "wide.jpg" };
 async function currentIcon(env) {
   try { const r = await env.DB.prepare("SELECT v FROM settings WHERE k = 'icon'").first(); if (r && ICONS.includes(r.v)) return r.v; } catch {}
@@ -158,7 +160,7 @@ function manifest(icon) {
   const v = "?i=" + icon;
   return JSON.stringify({
     name: "Els meus lloguers", short_name: "Lloguers", description: "Gestió dels meus pisos de lloguer", lang: "ca",
-    id: "/", start_url: "/", scope: "/", display: "standalone", background_color: "#0B1430", theme_color: "#0B1430",
+    id: "/", start_url: "/", scope: "/", display: "standalone", background_color: ICON_BG[icon] || "#0B1430", theme_color: "#0B1430",
     icons: [
       { src: "/icon-192.png" + v, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icon-512.png" + v, sizes: "512x512", type: "image/png", purpose: "any" },
@@ -239,7 +241,7 @@ async function api(request, env, url) {
     const { results } = await env.DB.prepare("SELECT * FROM ai_usage ORDER BY month DESC LIMIT 12").all();
     return json({ usage: results, model: env.AI_MODEL || DEFAULT_MODEL });
   }
-  if (p === "/api/settings" && m === "GET") return json({ icon: await currentIcon(env), icons: ICONS });
+  if (p === "/api/settings" && m === "GET") { const icon = await currentIcon(env); return json({ icon, icons: ICONS, bg: ICON_BG[icon] }); }
   if (p === "/api/settings" && m === "POST") {
     const body = await request.json().catch(() => null);
     if (!body || !ICONS.includes(body.icon)) return err("invalid_request", 400);
