@@ -1,5 +1,5 @@
 // Service worker mínim: permet instal·lar l'app. Les dades i els documents sempre vénen del servidor.
-const CACHE = "lloguers-v2";
+const CACHE = "lloguers-v3";
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(["/icon-192.png", "/icon-512.png"])).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {
