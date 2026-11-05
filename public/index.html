@@ -502,7 +502,21 @@ details.folder{box-shadow:var(--shadow)}
 .icb svg{width:17px;height:17px}
 .icb input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
 .chk{display:flex;align-items:center;gap:8px;font-weight:500}
-.panel.gestor .panel-h{align-items:center;flex-wrap:wrap;gap:10px}
+.form label.chk{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;text-align:left;width:auto}.form label.chk input{width:auto;flex:none}
+.dscan{position:fixed;inset:0;z-index:2000;background:#0B1020;color:#fff;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 12px) 12px calc(env(safe-area-inset-bottom,0px) + 12px)}
+.dscan .dsh{display:flex;flex-direction:column;gap:2px;padding:4px 4px 10px}.dscan .dsh span{font-size:.82rem;color:#AEB9DA}
+.dscan .dsstage{flex:1;min-height:0;display:grid;place-items:center;touch-action:none}
+.dscan .dsbox{position:relative}.dscan .dsbox img{width:100%;height:100%;display:block;user-select:none;-webkit-user-drag:none}
+.dscan svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.dscan polygon{fill:rgb(255 194 61 / .14);stroke:#FFC23D;stroke-width:2.5}
+.dscan .dspt{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #fff;background:#FFC23D;box-shadow:0 2px 10px #0008;touch-action:none;padding:0;cursor:grab}
+.dscan .dsact{display:flex;gap:8px;padding-top:12px}.dscan .dsact .btn{flex:1}
+
+.panel.gestor{display:flex;flex-direction:column;gap:8px}
+.gbtn{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2,var(--surface));color:var(--ink);cursor:pointer;font:inherit}
+.gbtn:hover{border-color:var(--gold)}.gbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.gbtn .gic{flex:none;width:42px;height:42px;border-radius:12px;background:var(--gold);color:#1A1405;display:grid;place-items:center}.gbtn .gic svg{width:22px;height:22px}
+.gbtn .gtx{display:flex;flex-direction:column;gap:2px;min-width:0}.gbtn b{font-size:1rem}.gbtn small{color:var(--muted);font-size:.8rem}
+.glink{align-self:flex-start;background:none;border:0;padding:2px 4px;color:var(--muted);font:inherit;font-size:.82rem;text-decoration:underline;cursor:pointer}
 
 details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;font-weight:600;font-size:.88rem;color:var(--muted)}
 details.fold>summary::-webkit-details-marker{display:none}
@@ -1077,7 +1091,7 @@ function viewResum(){
     ${chart12(vm)}
     ${yearLine(vm)}
   </section>
-  <section class="panel gestor"><div class="panel-h"><div><h2>Per al gestor</h2><p class="small muted" style="margin:2px 0 0">Ingressos, despeses, interessos i totes les factures d'un any, en un sol fitxer</p></div><button class="btn" data-act="gestor">Preparar paquet</button></div></section>`;
+  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestorGo"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b><small>Excel i factures del ${+today().slice(0,4)-1} de tots els pisos, en un sol fitxer</small></span></button><button type="button" class="glink" data-act="gestor">Canviar l'any o els pisos</button></section>`;
 }
 const CHEV=`<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 const todoLi = x => x.fold ? `<li class="tfold"><details class="fold" data-fold="todo-docs"${S.open.has("todo-docs")?" open":""}><summary><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${CHEV}</summary><ul class="todo sub">${x.sub}</ul></details></li>` : `<li><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${x.act}</li>`;
@@ -1304,7 +1318,7 @@ function mortgagePanel(p,k){
 
 
 /* ---------- package for the tax advisor ---------- */
-function gestorForm(){
+function gestorForm(auto){
   const cy=+today().slice(0,4), years=[...new Set([cy, cy-1, ...S.moves.map(m=>+String(m.date).slice(0,4)).filter(Boolean)])].sort((a,b)=>b-a);
   const def=+today().slice(5,7)<=6 ? cy-1 : cy-1;
   const ps=sortedProps();
@@ -1315,6 +1329,7 @@ function gestorForm(){
     <div id="g-st" class="note" hidden></div>
     <div class="actions"><button class="btn primary" id="g-go">Preparar i descarregar</button></div></form>`);
   $("#f-gest").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target); const y=+fd.get("year"), pids=fd.getAll("p"); if(!pids.length){ toast("Tria almenys un pis."); return; } await gestorBuild(y, pids); };
+  if(auto) $("#f-gest").requestSubmit();
 }
 function gestorData(y, pids){
   const Y=String(y), a=Y+"-01", b=Y+"-12", inY=d=>String(d||"").startsWith(Y);
@@ -2064,6 +2079,93 @@ function quickRent(id){
     {note: r.net!==r.base ? `Renda ${eur(r.base)}${r.iva?` + IVA ${eur(r.iva)}`:""}${r.ret?` − retenció ${eur(r.ret)}`:""}${r.fee?` − comissió ${eur(r.fee)}`:""} = ${eur(r.net)} que hauries de rebre.` : ""});
 }
 
+/* ================= escàner de documents (foto de la càmera) ================= */
+// Després de fer la foto: troba el full, deixa ajustar les 4 cantonades, el redreça i el deixa blanc i llegible.
+async function loadBitmap(file){
+  try{ return await createImageBitmap(file, {imageOrientation:"from-image"}); }
+  catch{ return await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=URL.createObjectURL(file); }); }
+}
+function dsDetect(cv){
+  // Busca la zona clara més gran (el paper) en una còpia petita i en treu les 4 cantonades.
+  const W=cv.width, H=cv.height, s=Math.min(1, 300/Math.max(W,H)), w=Math.max(8,Math.round(W*s)), h=Math.max(8,Math.round(H*s));
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.drawImage(cv,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data, g=new Uint8Array(w*h), hist=new Array(256).fill(0);
+  for(let i=0;i<w*h;i++){ const v=(d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11)|0; g[i]=v; hist[v]++; }
+  let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
+  let sB=0,wB=0,best=0,thr=128; for(let t=0;t<256;t++){ wB+=hist[t]; if(!wB) continue; const wF=w*h-wB; if(!wF) break; sB+=t*hist[t]; const mB=sB/wB, mF=(sum-sB)/wF, v=wB*wF*(mB-mF)*(mB-mF); if(v>best){best=v;thr=t;} }
+  const seen=new Uint8Array(w*h); let bestComp=null;
+  for(let i=0;i<w*h;i++){ if(seen[i]||g[i]<=thr) continue; const st=[i]; seen[i]=1; const comp=[];
+    while(st.length){ const p=st.pop(); comp.push(p); const px=p%w, py=(p/w)|0;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=px+dx, ny=py+dy; if(nx<0||ny<0||nx>=w||ny>=h) continue; const q=ny*w+nx; if(!seen[q]&&g[q]>thr){ seen[q]=1; st.push(q); } } }
+    if(!bestComp||comp.length>bestComp.length) bestComp=comp; }
+  const inset=()=>{ const m=0.06; return [[W*m,H*m],[W*(1-m),H*m],[W*(1-m),H*(1-m)],[W*m,H*(1-m)]]; };
+  if(!bestComp || bestComp.length < w*h*0.15 || bestComp.length > w*h*0.97) return inset();
+  let tl,tr,br,bl,a=1e9,b=-1e9,c2=-1e9,e=1e9;
+  for(const p of bestComp){ const px=p%w, py=(p/w)|0; if(px+py<a){a=px+py;tl=[px,py];} if(px+py>b){b=px+py;br=[px,py];} if(px-py>c2){c2=px-py;tr=[px,py];} if(px-py<e){e=px-py;bl=[px,py];} }
+  return [tl,tr,br,bl].map(([px,py])=>[(px+0.5)/s,(py+0.5)/s]);
+}
+function dsHomography(src, W, H){
+  // Matriu que porta el rectangle de sortida (W×H) a les 4 cantonades de la foto.
+  const dst=[[0,0],[W,0],[W,H],[0,H]], A=[], B=[];
+  for(let i=0;i<4;i++){ const [x,y]=dst[i], [u,v]=src[i]; A.push([x,y,1,0,0,0,-u*x,-u*y]); B.push(u); A.push([0,0,0,x,y,1,-v*x,-v*y]); B.push(v); }
+  for(let i=0;i<8;i++){ let m=i; for(let r=i+1;r<8;r++) if(Math.abs(A[r][i])>Math.abs(A[m][i])) m=r; [A[i],A[m]]=[A[m],A[i]]; [B[i],B[m]]=[B[m],B[i]];
+    for(let r=0;r<8;r++){ if(r===i) continue; const f=A[r][i]/A[i][i]; for(let k=i;k<8;k++) A[r][k]-=f*A[i][k]; B[r]-=f*B[i]; } }
+  return B.map((b,i)=>b/A[i][i]);
+}
+function dsWarp(cv, q){
+  const dist=(p,r)=>Math.hypot(p[0]-r[0],p[1]-r[1]);
+  let W=Math.max(dist(q[0],q[1]),dist(q[3],q[2])), H=Math.max(dist(q[0],q[3]),dist(q[1],q[2]));
+  const k=Math.min(1, 2200/Math.max(W,H)); W=Math.round(W*k); H=Math.round(H*k);
+  const h=dsHomography(q,W,H), sd=cv.getContext("2d").getImageData(0,0,cv.width,cv.height), sw=cv.width, shh=cv.height, s=sd.data;
+  const out=document.createElement("canvas"); out.width=W; out.height=H; const ox=out.getContext("2d"), od=ox.createImageData(W,H), o=od.data;
+  // Nivells: el paper queda blanc i el text fosc (es mantenen els colors).
+  const lum=new Uint32Array(256);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const z=h[6]*x+h[7]*y+1, fx=Math.min(sw-1.001,Math.max(0,(h[0]*x+h[1]*y+h[2])/z)), fy=Math.min(shh-1.001,Math.max(0,(h[3]*x+h[4]*y+h[5])/z));
+    const u=fx|0, v=fy|0, ax=fx-u, ay=fy-v, i00=(v*sw+u)*4, i10=i00+4, i01=i00+sw*4, i11=i01+4, di=(y*W+x)*4;
+    for(let c=0;c<3;c++) o[di+c]=(s[i00+c]*(1-ax)+s[i10+c]*ax)*(1-ay)+(s[i01+c]*(1-ax)+s[i11+c]*ax)*ay;
+    o[di+3]=255;
+    if(((x|y)&3)===0) lum[(o[di]*0.3+o[di+1]*0.59+o[di+2]*0.11)|0]++;
+  }
+  let tot=0; for(const n of lum) tot+=n; let acc=0, lo=0, hi=255;
+  for(let i=0;i<256;i++){ acc+=lum[i]; if(acc<tot*0.02) lo=i; if(acc<tot*0.80) hi=i; }
+  hi=Math.max(hi, lo+40); const sc=255/(hi-lo);
+  for(let i=0;i<o.length;i+=4){ for(let c=0;c<3;c++){ let v=(o[i+c]-lo)*sc; o[i+c]=v<0?0:v>255?255:v; } }
+  ox.putImageData(od,0,0); return out;
+}
+function docScan(file){
+  return new Promise(async resolve=>{
+    let bmp; try{ bmp=await loadBitmap(file); }catch{ resolve(file); return; }
+    const k=Math.min(1, 2600/Math.max(bmp.width,bmp.height)), cv=document.createElement("canvas");
+    cv.width=Math.round(bmp.width*k); cv.height=Math.round(bmp.height*k); cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+    let q=dsDetect(cv);
+    const ov=document.createElement("div"); ov.className="dscan"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","Retallar el document");
+    ov.innerHTML=`<div class="dsh"><b>Ajusta les cantonades del full</b><span>Arrossega els punts grocs fins a les puntes del paper</span></div>
+      <div class="dsstage"><div class="dsbox"><img alt=""><svg><polygon/></svg>${[0,1,2,3].map(i=>`<button type="button" class="dspt" data-i="${i}" aria-label="Cantonada ${i+1}"></button>`).join("")}</div></div>
+      <div class="dsact"><button type="button" class="btn ghost" data-ds="cancel">Cancel·lar</button><button type="button" class="btn" data-ds="raw">Sense retallar</button><button type="button" class="btn primary" data-ds="ok">Fet</button></div>`;
+    document.body.appendChild(ov);
+    const img=ov.querySelector("img"), box=ov.querySelector(".dsbox"), poly=ov.querySelector("polygon"), pts=[...ov.querySelectorAll(".dspt")], stage=ov.querySelector(".dsstage");
+    img.src=cv.toDataURL("image/jpeg",0.8);
+    let f=1;
+    const layout=()=>{ const r=stage.getBoundingClientRect(); f=Math.min(r.width/cv.width, r.height/cv.height); box.style.width=cv.width*f+"px"; box.style.height=cv.height*f+"px"; draw(); };
+    const draw=()=>{ poly.setAttribute("points", q.map(p=>p[0]*f+","+p[1]*f).join(" ")); pts.forEach((el,i)=>{ el.style.left=q[i][0]*f+"px"; el.style.top=q[i][1]*f+"px"; }); };
+    img.onload=layout; window.addEventListener("resize", layout);
+    pts.forEach(el=>{ el.addEventListener("pointerdown", e=>{ e.preventDefault(); el.setPointerCapture(e.pointerId); const i=+el.dataset.i;
+      const mv=ev=>{ const r=box.getBoundingClientRect(); q[i]=[Math.min(cv.width,Math.max(0,(ev.clientX-r.left)/f)), Math.min(cv.height,Math.max(0,(ev.clientY-r.top)/f))]; draw(); };
+      const up=()=>{ el.removeEventListener("pointermove",mv); el.removeEventListener("pointerup",up); el.removeEventListener("pointercancel",up); };
+      el.addEventListener("pointermove",mv); el.addEventListener("pointerup",up); el.addEventListener("pointercancel",up); }); });
+    const close=v=>{ window.removeEventListener("resize", layout); ov.remove(); resolve(v); };
+    ov.addEventListener("click", async e=>{ const a=e.target.closest("[data-ds]"); if(!a) return; const k2=a.dataset.ds;
+      if(k2==="cancel") return close(null);
+      if(k2==="raw") return close(file);
+      a.disabled=true; a.textContent="Preparant…"; await new Promise(r=>setTimeout(r,30));
+      try{ const out=dsWarp(cv,q); const blob=await new Promise(r=>out.toBlob(r,"image/jpeg",0.88));
+        const n=new Date(), nm=`Escaneig ${n.toLocaleDateString("sv-SE")} ${String(n.getHours()).padStart(2,"0")}${String(n.getMinutes()).padStart(2,"0")}.jpg`;
+        close(new File([blob], nm, {type:"image/jpeg"})); }
+      catch{ close(file); } });
+  });
+}
+
 /* ================= files & AI ================= */
 function loadScript(src){ return new Promise((res,rej)=>{ if(document.querySelector(`script[src="${src}"]`)) return res(); const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 async function loadPdf(file){
@@ -2130,7 +2232,9 @@ function scanPick(pid){
     let opened=false; const mark=()=>{ opened=true; }; window.addEventListener("blur", mark, {once:true}); document.addEventListener("visibilitychange", mark, {once:true}); el.addEventListener("change", mark, {once:true});
     setTimeout(()=>{ window.removeEventListener("blur", mark); document.removeEventListener("visibilitychange", mark); if(!opened && document.hasFocus()){ const n=$("#sc-nopick"); if(n) n.hidden=false; } }, 1500); }); });
   $("#sc-dir").addEventListener("click", ()=>{ const t=$("#sc-dirtip"); if(t) t.hidden=false; });
-  ["#sc-cam","#sc-files","#sc-dir","#sc-files2"].forEach(sel=>$(sel).addEventListener("change", e=>{ const fs=[...e.target.files]; e.target.value=""; if(!fs.length) return; startImport(fs.map(f=>({file:f, path:f.webkitRelativePath||f.name}))); }));
+  ["#sc-cam","#sc-files","#sc-dir","#sc-files2"].forEach(sel=>$(sel).addEventListener("change", async e=>{ const fs=[...e.target.files]; e.target.value=""; if(!fs.length) return;
+    if(sel==="#sc-cam" && fs.length===1 && /^image\//.test(fs[0].type||"image/")){ const f2=await docScan(fs[0]); if(!f2) return; startImport([{file:f2, path:f2.name}]); return; }
+    startImport(fs.map(f=>({file:f, path:f.webkitRelativePath||f.name}))); }));
 }
 const SCANCTX={hint:""};
 const SCANICON=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10"/></svg>`;
@@ -2173,7 +2277,7 @@ function scanListHTML(){
   if(!live.length && !err.length && !dups.length && !saved.length && !inbox.length) return "";
   const row=(ic,title,sub,btns="")=>`<li class="srow"><span class="sic ${ic}">${{ok:"✓",bad:"!",warn:"?",acc:"▣",run:"",dup:"="}[ic]||""}</span><div class="t"><b>${title}</b>${sub?`<div class="small muted">${sub}</div>`:""}</div>${btns?`<div class="sb">${btns}</div>`:""}</li>`;
   let h="";
-  if(live.length) h+=`<div class="fgroup">Llegint</div><ul class="slist">${live.map(x=>row("run",esc(x.name),x.status==="reading"?(x.deep?"Llegint la resta del document…":"Llegint…"):"A la cua")).join("")}</ul>`;
+  if(live.length) h+=`<div class="fgroup">Llegint</div><ul class="slist">${live.map(x=>row("run",esc(x.name),x.status==="reading"?(x.deep?"Llegint la resta del document…":"Llegint…"):"A la cua",`<button class="btn sm ghost" data-act="impDrop" data-id="${x.id}">No el guardis</button>`)).join("")}</ul>`;
   if(inbox.length) h+=`<div class="fgroup">Per revisar · ${inbox.length}</div><ul class="slist">${inbox.map(d=>{ const m=inboxMsg(d), r=d.res||{}; const sug=propById(m.sug);
     const others=sortedProps().filter(p=>!sug||p.id!==sug.id);
     let btns="";
@@ -2186,7 +2290,7 @@ function scanListHTML(){
     return row(m.k, title, `${m.t}${r.title?` · <span>${esc(r.title)}</span>`:""}`, btns); }).join("")}</ul>`;
   if(err.length) h+=`<div class="fgroup">Amb error</div><ul class="slist">${err.map(x=>row("bad",esc(x.name),esc(x.err||""),x.err&&!/20 MB/.test(x.err)?`<button class="btn sm" data-act="impRetry" data-id="${x.id}">Tornar a provar</button>`:"")).join("")}</ul>`;
   if(dups.length) h+=`<div class="fgroup">Ja els tenies · no s'han tornat a desar</div><ul class="slist">${dups.map(x=>row("dup",esc(x.name),esc(x.where?x.where.txt:""),x.where&&x.where.pid?`<button class="btn sm ghost" data-act="openDocsClose" data-id="${x.where.pid}">Veure</button>`:"")).join("")}</ul>`;
-  if(saved.length) h+=`<div class="fgroup">Desats ara</div><ul class="slist">${saved.map(x=>row("ok",esc(x.name),`${esc(x.res&&x.res.title||"")}${x.res&&x.res.propId?" · "+esc((propById(x.res.propId)||{}).name||""):""}`)).join("")}</ul>`;
+  if(saved.length) h+=`<div class="fgroup">Desats ara</div><ul class="slist">${saved.map(x=>row("ok",esc(x.name),`${esc(x.res&&x.res.title||"")}${x.res&&x.res.propId?" · "+esc((propById(x.res.propId)||{}).name||""):""}`, ["moviment","document"].includes(x.kindSaved)&&x.up?`<button class="btn sm ghost" data-act="impUndo" data-id="${x.id}">No el guardis</button>`:"")).join("")}</ul>`;
   return h;
 }
 function scanCount(){
@@ -2533,7 +2637,7 @@ async function impRun(){
   if(IMP.running) return;
   if(!sample){ IMP.msg="La lectura automàtica no està disponible en aquesta vista."; render(); return; }
   IMP.running=true; IMP.stop=false; IMP.msg=""; render();
-  const worker = async () => { while(!IMP.stop){ const x=IMP.items.find(i=>i.status==="pending"); if(!x) break; x.status="reading"; render(); await impAnalyze(x); render(); } };
+  const worker = async () => { while(!IMP.stop){ const x=IMP.items.find(i=>i.status==="pending"); if(!x) break; x.status="reading"; render(); await impAnalyze(x); if(x.removed) x.status="removed"; render(); } };
   await Promise.all([worker(), worker()]);
   IMP.running=false; render();
   if(!IMP.stop && IMP.items.some(x=>x.status==="ready")) await impSave(true);
@@ -2615,6 +2719,7 @@ async function impSaveOne(x){
   const r=x.res;
   { const pp=propById(r.propId); if(pp && !pp.address && r.addr && r.kind!=="alie") db.doc("props/"+pp.id).update({address:r.addr}).catch(()=>{}); }
   const up = x.up || await (async()=>{ const blob=await prepUpload(x.file); return assets.upload(blob,{type:blob.type||"application/pdf"}); })();
+  x.up = up;
   if(r.move){
     const {fee, net, ...mv}=r.move;
     const d={...mv, ref:r.ref||"", propId:r.propId, docId:up.id, docMime:up.contentType, source:"importacio", srcKey:x.key, createdAt:Date.now()};
@@ -2737,7 +2842,8 @@ async function impSave(auto){
   for(const x of list){
     const r=x.res;
     if((!r.move && !r.propId) || (r.move && !r.move.amount)){ skip++; continue; }
-    try{ const k=await impSaveOne(x); kinds[k]=(kinds[k]||0)+1; x.status="saved"; ok++; render(); }
+    if(x.removed){ x.status="removed"; continue; }
+    try{ x.t0=Date.now()-1000; const k=await impSaveOne(x); x.kindSaved=k; kinds[k]=(kinds[k]||0)+1; x.status="saved"; ok++; render(); }
     catch(e){ x.status="error"; x.err=upErr(e).split(".")[0]; render(); if(e&&e.code==="quota_or_state") break; }
   }
   IMP.saving=false;
@@ -2848,7 +2954,7 @@ const ACT = {
   newContract: id => contractForm({}, id), editContract: id => contractForm(conById(id)), delContract, endContract: id => endContractForm(id),
   editMortgage: id => mortgageForm(id),
   privToggle: () => { const on=!document.body.classList.contains("priv"); document.body.classList.toggle("priv", on); try{ localStorage.setItem("lloguers-priv", on?"1":""); }catch{} render(); },
-  gestor: () => gestorForm(), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
   markUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:[...new Set([...(c.unpaid||[]), mo])]}); closeSheet(); toast(`${monthLabel(mo)} marcat com a no cobrat`); }catch{ toast("No s'ha pogut desar."); } },
   clearUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:(c.unpaid||[]).filter(x=>x!==mo)}); closeSheet(); toast("Marca treta"); }catch{ toast("No s'ha pogut desar."); } },
@@ -2880,6 +2986,20 @@ const ACT = {
   unlinkDoc: id => { const f=$("#f-con"); if(f && f._unlink) f._unlink(+id); },
   newMove: id => moveForm({propId:id||""}), editMove: id => moveForm(S.moves.find(x=>x.id===id)), delMove,
   quickRent, scan: id => scanPick(id), closeSheet, delDoc,
+  impDrop: id => { const x=IMP.items.find(i=>i.id===+id); if(!x) return; x.removed=true; x.include=false; if(x.status==="pending") x.status="removed"; if(SCANCTX.count>0) SCANCTX.count--; toast("D'acord, no el guardo"); render(); },
+  impUndo: async id => { const x=IMP.items.find(i=>i.id===+id); if(!x||!x.up) return;
+    if(!confirm(`Treure «${x.name}» de l'app? S'esborrarà el que s'ha desat d'aquest document.`)) return;
+    try{
+      const fid=x.up.id;
+      for(const m of S.moves.filter(m=>m.docId===fid || (m.srcKey===x.key && (m.createdAt||0)>=x.t0))){
+        if((m.createdAt||0)>=x.t0) await db.doc("moves/"+m.id).delete();
+        else await db.doc("moves/"+m.id).update({docId:"", docMime:"", docName:""});
+      }
+      for(const d of S.docs.filter(d=>d.docId===fid)) await db.doc("docs/"+d.id).delete();
+      const still=S.moves.some(m=>m.docId===fid)||S.docs.some(d=>d.docId===fid)||S.contracts.some(c=>(c.docs||[]).some(z=>z.id===fid))||S.props.some(p=>p.photo&&p.photo.id===fid);
+      if(!still && assets) await assets.delete(fid).catch(()=>{});
+      x.status="removed"; if(SCANCTX.count>0) SCANCTX.count--; toast("Fet, no s'ha guardat"); render();
+    }catch{ toast("No s'ha pogut treure. Torna-ho a provar."); } },
   impRun, impStop, impSave, impEdit, impRetry: id => { const x=IMP.items.find(i=>i.id===+id); if(x){ x.status="pending"; x.err=""; impRun(); } },
   impClear: () => { IMP.items=[]; IMP.skipped=0; IMP.msg=""; IMP.hint=""; S.view="resum"; render(); }
 };
