@@ -2099,23 +2099,66 @@ async function loadBitmap(file){
   return await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error("no es pot obrir la foto")); im.src=URL.createObjectURL(file); });
 }
 function dsDetect(cv){
-  // Busca la zona clara més gran (el paper) en una còpia petita i en treu les 4 cantonades.
-  const W=cv.width, H=cv.height, s=Math.min(1, 300/Math.max(W,H)), w=Math.max(8,Math.round(W*s)), h=Math.max(8,Math.round(H*s));
-  const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.drawImage(cv,0,0,w,h);
-  const d=x.getImageData(0,0,w,h).data, g=new Uint8Array(w*h), hist=new Array(256).fill(0);
-  for(let i=0;i<w*h;i++){ const v=(d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11)|0; g[i]=v; hist[v]++; }
-  let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
-  let sB=0,wB=0,best=0,thr=128; for(let t=0;t<256;t++){ wB+=hist[t]; if(!wB) continue; const wF=w*h-wB; if(!wF) break; sB+=t*hist[t]; const mB=sB/wB, mF=(sum-sB)/wF, v=wB*wF*(mB-mF)*(mB-mF); if(v>best){best=v;thr=t;} }
-  const seen=new Uint8Array(w*h); let bestComp=null;
-  for(let i=0;i<w*h;i++){ if(seen[i]||g[i]<=thr) continue; const st=[i]; seen[i]=1; const comp=[];
-    while(st.length){ const p=st.pop(); comp.push(p); const px=p%w, py=(p/w)|0;
-      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=px+dx, ny=py+dy; if(nx<0||ny<0||nx>=w||ny>=h) continue; const q=ny*w+nx; if(!seen[q]&&g[q]>thr){ seen[q]=1; st.push(q); } } }
-    if(!bestComp||comp.length>bestComp.length) bestComp=comp; }
+  // 1) Busca les vores rectes del paper (línies fortes) i tria el quadrilàter que millor hi encaixa.
+  // 2) Si no en troba cap de clar, fa servir la zona clara més gran. 3) Si tampoc, un marge fix.
+  const W=cv.width, H=cv.height, s=Math.min(1, 360/Math.max(W,H)), w=Math.max(16,Math.round(W*s)), h=Math.max(16,Math.round(H*s));
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.filter="blur(1.5px)"; x.drawImage(cv,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data, g=new Float32Array(w*h);
+  for(let i=0;i<w*h;i++) g[i]=d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11;
+  const back=q=>q.map(([px,py])=>[Math.min(W,Math.max(0,(px+0.5)/s)),Math.min(H,Math.max(0,(py+0.5)/s))]);
   const inset=()=>{ const m=0.06; return [[W*m,H*m],[W*(1-m),H*m],[W*(1-m),H*(1-m)],[W*m,H*(1-m)]]; };
-  if(!bestComp || bestComp.length < w*h*0.15 || bestComp.length > w*h*0.97) return inset();
+  // gradient
+  const mag=new Float32Array(w*h); const vals=[];
+  for(let y=1;y<h-1;y++) for(let X=1;X<w-1;X++){ const i=y*w+X;
+    const gx=(g[i-w+1]+2*g[i+1]+g[i+w+1])-(g[i-w-1]+2*g[i-1]+g[i+w-1]), gy=(g[i+w-1]+2*g[i+w]+g[i+w+1])-(g[i-w-1]+2*g[i-w]+g[i-w+1]);
+    const m=Math.hypot(gx,gy); mag[i]=m; if(((X^y)&1)===0) vals.push(m); }
+  vals.sort((a,b)=>a-b); const thr=Math.max(20, vals[Math.floor(vals.length*0.88)]||0);
+  const diag=Math.ceil(Math.hypot(w,h)), NT=180, acc=new Float32Array(NT*(2*diag+1)), cs=[], sn=[];
+  for(let t=0;t<NT;t++){ cs.push(Math.cos(t*Math.PI/NT)); sn.push(Math.sin(t*Math.PI/NT)); }
+  const edge=new Uint8Array(w*h);
+  for(let y=1;y<h-1;y++) for(let X=1;X<w-1;X++){ const i=y*w+X, m=mag[i]; if(m<thr) continue; edge[i]=1;
+    for(let t=0;t<NT;t++){ const r=Math.round(X*cs[t]+y*sn[t])+diag; acc[t*(2*diag+1)+r]+=1; } }
+  // pics del Hough
+  const lines=[], used=new Uint8Array(acc.length);
+  for(let k=0;k<16;k++){ let bi=-1,bv=0; for(let i=0;i<acc.length;i++) if(!used[i]&&acc[i]>bv){bv=acc[i];bi=i;}
+    if(bi<0||bv<Math.min(w,h)*0.18) break; const t=Math.floor(bi/(2*diag+1)), r=bi%(2*diag+1)-diag; lines.push({t,r,v:bv});
+    for(let dt=-8;dt<=8;dt++) for(let dr=-10;dr<=10;dr++){ const tt=(t+dt+NT)%NT, rr=(dt+t<0||dt+t>=NT)?-(r+dr):r+dr, j=tt*(2*diag+1)+rr+diag; if(j>=0&&j<acc.length) used[j]=1; } }
+  const inter=(a,b)=>{ const c1=cs[a.t],s1=sn[a.t],c2=cs[b.t],s2=sn[b.t], det=c1*s2-s1*c2; if(Math.abs(det)<1e-3) return null; return [(a.r*s2-b.r*s1)/det,(c1*b.r-c2*a.r)/det]; };
+  const support=(p,q)=>{ const n=Math.max(8,Math.round(Math.hypot(q[0]-p[0],q[1]-p[1])/2)); let hit=0;
+    for(let k=1;k<n;k++){ const X=Math.round(p[0]+(q[0]-p[0])*k/n), Y=Math.round(p[1]+(q[1]-p[1])*k/n); let f=0;
+      for(let dy=-1;dy<=1&&!f;dy++) for(let dx=-1;dx<=1&&!f;dx++){ const xx=X+dx, yy=Y+dy; if(xx>=0&&yy>=0&&xx<w&&yy<h&&edge[yy*w+xx]) f=1; } hit+=f; }
+    return hit/(n-1); };
+  const angd=(a,b)=>{ const dd=Math.abs(a-b)%NT; return Math.min(dd,NT-dd); };
+  let best=null;
+  for(let i=0;i<lines.length;i++) for(let j=i+1;j<lines.length;j++){ const A=lines[i],B=lines[j]; if(angd(A.t,B.t)>20) continue;
+    for(let k=0;k<lines.length;k++) for(let l=k+1;l<lines.length;l++){ if([i,j].includes(k)||[i,j].includes(l)) continue; const C=lines[k],D=lines[l];
+      if(angd(C.t,D.t)>20 || angd(A.t,C.t)<55) continue;
+      const P=[inter(A,C),inter(C,B),inter(B,D),inter(D,A)]; if(P.some(p=>!p||p[0]<-w*0.03||p[1]<-h*0.03||p[0]>w*1.03||p[1]>h*1.03)) continue;
+      const cx=P.reduce((a,p)=>a+p[0],0)/4, cy=P.reduce((a,p)=>a+p[1],0)/4;
+      P.sort((p,q)=>Math.atan2(p[1]-cy,p[0]-cx)-Math.atan2(q[1]-cy,q[0]-cx));
+      let area=0; for(let z=0;z<4;z++){ const p=P[z],q=P[(z+1)%4]; area+=p[0]*q[1]-q[0]*p[1]; } area=Math.abs(area)/2;
+      if(area<w*h*0.12 || area>w*h*0.98) continue;
+      const sup=[0,1,2,3].map(z=>support(P[z],P[(z+1)%4])); if(Math.min(...sup)<0.25) continue;
+      const centre=1-Math.hypot(cx-w/2,cy-h/2)/Math.hypot(w/2,h/2);
+      const score=(sup.reduce((a,b)=>a+b,0)/4)*1.0 + Math.min(...sup)*0.6 + Math.sqrt(area/(w*h))*0.5 + centre*0.3;
+      if(!best||score>best.score) best={score,P}; } }
+  if(best){ let P=best.P; const k0=P.reduce((bi,p,i)=>p[0]+p[1]<P[bi][0]+P[bi][1]?i:bi,0); P=[0,1,2,3].map(z=>P[(k0+z)%4]);
+    // ordre: dalt-esquerra, dalt-dreta, baix-dreta, baix-esquerra
+    if(P[1][1]>P[3][1]) P=[P[0],P[3],P[2],P[1]];
+    return back(P); }
+  // pla B: zona clara més gran
+  const hist=new Array(256).fill(0); for(let i=0;i<w*h;i++) hist[Math.min(255,g[i]|0)]++;
+  let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
+  let sB=0,wB=0,bv=0,th=128; for(let t=0;t<256;t++){ wB+=hist[t]; if(!wB) continue; const wF=w*h-wB; if(!wF) break; sB+=t*hist[t]; const mB=sB/wB, mF=(sum-sB)/wF, v=wB*wF*(mB-mF)*(mB-mF); if(v>bv){bv=v;th=t;} }
+  const seen=new Uint8Array(w*h); let bc=null;
+  for(let i=0;i<w*h;i++){ if(seen[i]||g[i]<=th) continue; const st=[i]; seen[i]=1; const comp=[];
+    while(st.length){ const p=st.pop(); comp.push(p); const px=p%w, py=(p/w)|0;
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=px+dx, ny=py+dy; if(nx<0||ny<0||nx>=w||ny>=h) continue; const q=ny*w+nx; if(!seen[q]&&g[q]>th){ seen[q]=1; st.push(q); } } }
+    if(!bc||comp.length>bc.length) bc=comp; }
+  if(!bc || bc.length<w*h*0.15 || bc.length>w*h*0.9) return inset();
   let tl,tr,br,bl,a=1e9,b=-1e9,c2=-1e9,e=1e9;
-  for(const p of bestComp){ const px=p%w, py=(p/w)|0; if(px+py<a){a=px+py;tl=[px,py];} if(px+py>b){b=px+py;br=[px,py];} if(px-py>c2){c2=px-py;tr=[px,py];} if(px-py<e){e=px-py;bl=[px,py];} }
-  return [tl,tr,br,bl].map(([px,py])=>[(px+0.5)/s,(py+0.5)/s]);
+  for(const p of bc){ const px=p%w, py=(p/w)|0; if(px+py<a){a=px+py;tl=[px,py];} if(px+py>b){b=px+py;br=[px,py];} if(px-py>c2){c2=px-py;tr=[px,py];} if(px-py<e){e=px-py;bl=[px,py];} }
+  return back([tl,tr,br,bl]);
 }
 function dsHomography(src, W, H){
   // Matriu que porta el rectangle de sortida (W×H) a les 4 cantonades de la foto.
@@ -2191,7 +2234,7 @@ async function docScan(file){
 async function camScan(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return undefined;
   let stream;
-  const tries=[{facingMode:{exact:"environment"}, width:{ideal:3840}, height:{ideal:2160}}, {facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1080}}];
+  const tries=[{facingMode:{exact:"environment"}, width:{ideal:4096}, height:{ideal:4096}}, {facingMode:{exact:"environment"}}, {facingMode:{ideal:"environment"}}];
   for(const v of tries){ try{ stream=await navigator.mediaDevices.getUserMedia({video:v, audio:false}); break; }catch(e){ if(e && (e.name==="NotAllowedError"||e.name==="SecurityError")){ toast("No tinc permís per fer servir la càmera. Activa'l a la configuració del navegador."); return null; } } }
   if(!stream) return undefined;
   const track=stream.getVideoTracks()[0];
@@ -2208,9 +2251,15 @@ async function camScan(){
     ov.addEventListener("click", async e=>{ const b=e.target.closest("[data-c]"); if(!b) return;
       if(b.dataset.c==="close"){ onBack(); return; }
       b.disabled=true;
+      // Només la part que es veia a la pantalla (el vídeo es mostra retallat per omplir-la).
+      const VW=video.videoWidth, VH=video.videoHeight, vr=video.getBoundingClientRect(), k=Math.max(vr.width/VW, vr.height/VH);
+      const fw=Math.min(1,(vr.width/k)/VW), fh=Math.min(1,(vr.height/k)/VH), fx=(1-fw)/2, fy=(1-fh)/2;
+      const crop=(src,sw,sh)=>{ const c=document.createElement("canvas"); c.width=Math.round(sw*fw); c.height=Math.round(sh*fh); c.getContext("2d").drawImage(src, sw*fx, sh*fy, sw*fw, sh*fh, 0, 0, c.width, c.height); return c; };
       let cv=null;
-      try{ if(window.ImageCapture){ const blob=await new ImageCapture(track).takePhoto(); cv=await fileToCanvas(blob); } }catch{}
-      if(!cv){ cv=document.createElement("canvas"); cv.width=video.videoWidth; cv.height=video.videoHeight; cv.getContext("2d").drawImage(video,0,0); }
+      try{ if(window.ImageCapture){ const blob=await new ImageCapture(track).takePhoto(); const full=await fileToCanvas(blob);
+        // La foto només serveix si té la mateixa forma que el vídeo; si no, es fa servir el fotograma del vídeo.
+        if(Math.abs(full.width/full.height - VW/VH) < 0.03) cv=crop(full, full.width, full.height); } }catch{}
+      if(!cv) cv=crop(video, VW, VH);
       ov.style.visibility="hidden";
       const r=await dsCrop(cv, {retake:true});
       if(r==="retake"){ ov.style.visibility=""; b.disabled=false; return; }
