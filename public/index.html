@@ -1048,12 +1048,12 @@ function viewResum(){
   return `${askPanel}
   <section class="hero hero2" aria-label="Aquest mes">
     <div style="position:relative">
-      ${(()=>{ const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"&&!INVEST.includes(x.category))), othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
+      ${(()=>{ const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma")), othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
         const fl=Math.round((expected+othInc-outOp-hip)*100)/100;
         return `<div class="htop"><span class="eyebrow">${monthName(m)} ${m.slice(0,4)}</span>${todo.length?`<a class="hchip" href="#per-revisar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>${todo.length} avís${todo.length===1?"":"os"}</a>`:`<span class="hchip ok">Tot en ordre</span>`}<button type="button" class="eyeb" data-act="privToggle" aria-pressed="${document.body.classList.contains("priv")}" title="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}" aria-label="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}">${document.body.classList.contains("priv")?EYE_OFF:EYE_ON}</button></div>
       <div class="bigl">Aquest mes et quedaran</div>
       <div class="big ${fl<0?"neg":""}">${eur(fl)}</div>
-      <div class="hsub">${fl<0?"Aquest mes gastaràs més del que cobraràs":"És el que et queda dels lloguers després de pagar les despeses i la hipoteca"}</div>`; })()}
+      <div class="hsub">${fl<0?"Aquest mes gastaràs més del que cobraràs":"És el que et queda dels lloguers després de pagar totes les despeses i rebuts del mes i la hipoteca"}</div>`; })()}
     </div>
     ${(()=>{ const pc=expected?Math.min(100,Math.round(cobrat/expected*100)):0;
       const floors=sortedProps().filter(p=>current(p.id).length).map(p=>{ const cs=current(p.id), e=sum(cs,c=>split(c,m).net), g=sum(cs,c=>Math.min(sum(rentMoves(c,m)), split(c,m).net)); return {name:p.name, f:e?g/e:1, none:!e}; });
@@ -1061,7 +1061,7 @@ function viewResum(){
     <div class="hstats">
       <div><span class="label">Lloguers del mes</span><span class="num">${eur(expected)}</span><small>${cur.length} contracte${cur.length===1?"":"s"}${cur.some(c=>+c.feePct>0)?" · nets de comissió":""}</small></div>
       <div><span class="label">Lloguers cobrats</span><span class="num">${eur(cobrat)}</span><span class="hbar"><i style="width:${expected?Math.min(100,Math.round(cobrat/expected*100)):0}%"></i></span></div>
-      <div><span class="label">Despeses i hipoteca</span><span class="num">${eur(sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"&&!INVEST.includes(x.category)))+hip)}</span><small>${hip?`hipoteca ${eur(hip)}`:"sense hipoteca"}</small></div>
+      <div><span class="label">Despeses i hipoteca</span><span class="num">${eur(sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+hip)}</span><small>${(()=>{ const ex=sum(mm.filter(x=>x.type==="despesa"&&INVEST.includes(x.category))); const d=sum(mm.filter(x=>x.type==="despesa"&&x.category==="Derrama")); return [hip?`hipoteca ${eur(hip)}`:"sense hipoteca", ex?(d===ex?`derrama ${eur(d)}`:`extraordinàries ${eur(ex)}`):""].filter(Boolean).join(" · "); })()}</small></div>
     </div>
   </section>
   <section class="panel">
@@ -1084,9 +1084,9 @@ const todoLi = x => x.fold ? `<li class="tfold"><details class="fold" data-fold=
 
 function yearLine(vm){
   const y=today().slice(0,4), ym=vm.filter(x=>String(x.date).startsWith(y));
-  const inc=sum(ym.filter(x=>x.type==="ingres")), out=sum(ym.filter(x=>x.type==="despesa" && !INVEST.includes(x.category))), inv=sum(ym.filter(x=>x.type==="despesa" && INVEST.includes(x.category)));
+  const inc=sum(ym.filter(x=>x.type==="ingres")), out=sum(ym.filter(x=>x.type==="despesa" && x.category!=="Despeses de compra")), inv=sum(ym.filter(x=>x.type==="despesa" && x.category==="Despeses de compra"));
   let hip=0; for(let mo=y+"-01"; mo<=curMonth(); mo=addMonths(mo,1)) hip+=mtgMonthAll(mo);
-  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span>Net <b class="num">${eur(inc-out-hip)}</b></span>${inv?`<span class="muted">+ inversió en compra i millores ${eur(inv)}</span>`:""}</div>`;
+  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span>Net <b class="num">${eur(inc-out-hip)}</b></span>${inv?`<span class="muted">+ despeses de compra ${eur(inv)}</span>`:""}</div>`;
 }
 
 function niceMax(v){ if(v<=0) return 100; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
@@ -1113,7 +1113,7 @@ function emptyStart(){
 }
 
 /* ---------- Pisos ---------- */
-function earned(p, y){ const ms=movesOf(p.id).filter(m=>!y||String(m.date).startsWith(String(y))), inc=sum(ms.filter(m=>m.type==="ingres"&&m.category!=="Fiança")), out=sum(ms.filter(m=>m.type==="despesa"&&!INVEST.includes(m.category))); const M=mtg(p), int=M?mtgSum(M, y?String(y)+"-01":M.start, curMonth(), "int"):0; return Math.round((inc-out-int)*100)/100; }
+function earned(p, y){ const ms=movesOf(p.id).filter(m=>!y||String(m.date).startsWith(String(y))), inc=sum(ms.filter(m=>m.type==="ingres"&&m.category!=="Fiança")), out=sum(ms.filter(m=>m.type==="despesa"&&m.category!=="Despeses de compra")); const M=mtg(p), int=M?mtgSum(M, y?String(y)+"-01":M.start, curMonth(), "int"):0; return Math.round((inc-out-int)*100)/100; }
 function viewProps(){
   if (!S.props.length) return emptyStart();
   const m=curMonth();
