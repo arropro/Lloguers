@@ -2082,8 +2082,10 @@ function quickRent(id){
 /* ================= escàner de documents (foto de la càmera) ================= */
 // Després de fer la foto: troba el full, deixa ajustar les 4 cantonades, el redreça i el deixa blanc i llegible.
 async function loadBitmap(file){
-  try{ return await createImageBitmap(file, {imageOrientation:"from-image"}); }
-  catch{ return await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=URL.createObjectURL(file); }); }
+  // Les fotos del mòbil poden fer 50 megapíxels: es descodifiquen ja reduïdes perquè el mòbil no es quedi sense memòria.
+  try{ return await createImageBitmap(file, {imageOrientation:"from-image", resizeWidth:2000, resizeQuality:"high"}); }catch{}
+  try{ return await createImageBitmap(file, {imageOrientation:"from-image"}); }catch{}
+  return await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error("no es pot obrir la foto")); im.src=URL.createObjectURL(file); });
 }
 function dsDetect(cv){
   // Busca la zona clara més gran (el paper) en una còpia petita i en treu les 4 cantonades.
@@ -2135,10 +2137,14 @@ function dsWarp(cv, q){
 }
 function docScan(file){
   return new Promise(async resolve=>{
-    let bmp; try{ bmp=await loadBitmap(file); }catch{ resolve(file); return; }
-    const k=Math.min(1, 2600/Math.max(bmp.width,bmp.height)), cv=document.createElement("canvas");
-    cv.width=Math.round(bmp.width*k); cv.height=Math.round(bmp.height*k); cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
-    let q=dsDetect(cv);
+    let cv, q;
+    try{
+      const bmp=await loadBitmap(file);
+      const bw=bmp.width||bmp.naturalWidth, bh=bmp.height||bmp.naturalHeight, k=Math.min(1, 2600/Math.max(bw,bh));
+      cv=document.createElement("canvas"); cv.width=Math.round(bw*k); cv.height=Math.round(bh*k); cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+      if(bmp.close) bmp.close();
+      q=dsDetect(cv);
+    }catch(err){ toast("No he pogut preparar l'escàner ("+((err&&err.message)||"error")+"). Llegeixo la foto tal qual."); resolve(file); return; }
     const ov=document.createElement("div"); ov.className="dscan"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","Retallar el document");
     ov.innerHTML=`<div class="dsh"><b>Ajusta les cantonades del full</b><span>Arrossega els punts grocs fins a les puntes del paper</span></div>
       <div class="dsstage"><div class="dsbox"><img alt=""><svg><polygon/></svg>${[0,1,2,3].map(i=>`<button type="button" class="dspt" data-i="${i}" aria-label="Cantonada ${i+1}"></button>`).join("")}</div></div>
@@ -2149,7 +2155,7 @@ function docScan(file){
     let f=1;
     const layout=()=>{ const r=stage.getBoundingClientRect(); f=Math.min(r.width/cv.width, r.height/cv.height); box.style.width=cv.width*f+"px"; box.style.height=cv.height*f+"px"; draw(); };
     const draw=()=>{ poly.setAttribute("points", q.map(p=>p[0]*f+","+p[1]*f).join(" ")); pts.forEach((el,i)=>{ el.style.left=q[i][0]*f+"px"; el.style.top=q[i][1]*f+"px"; }); };
-    img.onload=layout; window.addEventListener("resize", layout);
+    img.onload=layout; if(img.complete) setTimeout(layout,0); setTimeout(layout,300); window.addEventListener("resize", layout);
     pts.forEach(el=>{ el.addEventListener("pointerdown", e=>{ e.preventDefault(); el.setPointerCapture(e.pointerId); const i=+el.dataset.i;
       const mv=ev=>{ const r=box.getBoundingClientRect(); q[i]=[Math.min(cv.width,Math.max(0,(ev.clientX-r.left)/f)), Math.min(cv.height,Math.max(0,(ev.clientY-r.top)/f))]; draw(); };
       const up=()=>{ el.removeEventListener("pointermove",mv); el.removeEventListener("pointerup",up); el.removeEventListener("pointercancel",up); };
