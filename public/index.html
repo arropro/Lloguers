@@ -520,6 +520,14 @@ details.folder{box-shadow:var(--shadow)}
 .dcam .dcbot{position:absolute;left:0;right:0;bottom:0;display:grid;place-items:center;padding:16px 0 calc(env(safe-area-inset-bottom,0px) + 24px);background:linear-gradient(#0000,#000a)}
 .dcam .dcshot{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:#FFC23D;box-shadow:0 0 0 3px #0006;cursor:pointer}
 .dcam .dcshot:disabled{opacity:.5}
+.dcam .dclive{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.dcam .dclive polygon{fill:rgb(255 194 61 / .18);stroke:#FFC23D;stroke-width:3;stroke-linejoin:round;opacity:0;transition:opacity .15s}
+.dcam.ready .dclive polygon{fill:rgb(76 217 100 / .22);stroke:#4CD964}
+.dcam.flash::after{content:"";position:absolute;inset:0;background:#fff;opacity:.7;pointer-events:none}
+.dcam .dcbot{display:flex!important;align-items:center;justify-content:space-between;padding-left:20px!important;padding-right:20px!important}
+.dcam .dcauto{display:flex;align-items:center;gap:6px;font-size:.85rem;min-width:110px}.dcam .dcsp{min-width:110px}
+.dcam .dcshot svg{display:none}
+
 
 
 .panel.gestor{display:flex;flex-direction:column;gap:8px}
@@ -2098,10 +2106,10 @@ async function loadBitmap(file){
   try{ return await createImageBitmap(file, {imageOrientation:"from-image"}); }catch{}
   return await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error("no es pot obrir la foto")); im.src=URL.createObjectURL(file); });
 }
-function dsDetect(cv){
+function dsDetect(cv, opts={}){
   // 1) Busca les vores rectes del paper (línies fortes) i tria el quadrilàter que millor hi encaixa.
   // 2) Si no en troba cap de clar, fa servir la zona clara més gran. 3) Si tampoc, un marge fix.
-  const W=cv.width, H=cv.height, s=Math.min(1, 360/Math.max(W,H)), w=Math.max(16,Math.round(W*s)), h=Math.max(16,Math.round(H*s));
+  const W=cv.width, H=cv.height, s=Math.min(1, (opts.max||360)/Math.max(W,H)), w=Math.max(16,Math.round(W*s)), h=Math.max(16,Math.round(H*s));
   const c=document.createElement("canvas"); c.width=w; c.height=h; const x=c.getContext("2d"); x.filter="blur(1.5px)"; x.drawImage(cv,0,0,w,h);
   const d=x.getImageData(0,0,w,h).data, g=new Float32Array(w*h);
   for(let i=0;i<w*h;i++) g[i]=d[i*4]*0.3+d[i*4+1]*0.59+d[i*4+2]*0.11;
@@ -2146,6 +2154,7 @@ function dsDetect(cv){
     // ordre: dalt-esquerra, dalt-dreta, baix-dreta, baix-esquerra
     if(P[1][1]>P[3][1]) P=[P[0],P[3],P[2],P[1]];
     return back(P); }
+  if(opts.strict) return null;
   // pla B: zona clara més gran
   const hist=new Array(256).fill(0); for(let i=0;i<w*h;i++) hist[Math.min(255,g[i]|0)]++;
   let sum=0; for(let t=0;t<256;t++) sum+=t*hist[t];
@@ -2201,7 +2210,7 @@ const canvasFile = async (cv, q=0.9) => new File([await new Promise(r=>cv.toBlob
 // Pantalla per ajustar les cantonades. Torna un File, null (cancel·lat) o "retake" (tornar a fer la foto).
 function dsCrop(cv, opts={}){
   return new Promise(resolve=>{
-    let q=dsDetect(cv);
+    let q=dsDetect(cv,{strict:true,max:520}) || opts.q || dsDetect(cv);
     const ov=document.createElement("div"); ov.className="dscan"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","Retallar el document");
     ov.innerHTML=`<div class="dsh"><button type="button" class="dsback" data-ds="${opts.retake?"retake":"cancel"}" aria-label="Enrere">‹</button><div><b>Ajusta les cantonades del full</b><span>Arrossega els punts grocs fins a les puntes del paper</span></div></div>
       <div class="dsstage"><div class="dsbox"><img alt=""><svg><polygon/></svg>${[0,1,2,3].map(i=>`<button type="button" class="dspt" data-i="${i}" aria-label="Cantonada ${i+1}"></button>`).join("")}</div></div>
@@ -2239,21 +2248,41 @@ async function camScan(){
   if(!stream) return undefined;
   const track=stream.getVideoTracks()[0];
   const ov=document.createElement("div"); ov.className="dcam"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","Càmera");
-  ov.innerHTML=`<video playsinline autoplay muted></video><div class="dcframe" aria-hidden="true"></div>
-    <div class="dctop"><button type="button" class="dsback" data-c="close" aria-label="Enrere">‹</button><span>Enquadra el full sencer i fes la foto</span></div>
-    <div class="dcbot"><button type="button" class="dcshot" data-c="shot" aria-label="Fer la foto"></button></div>`;
+  ov.innerHTML=`<video playsinline autoplay muted></video><svg class="dclive" aria-hidden="true"><polygon/></svg>
+    <div class="dctop"><button type="button" class="dsback" data-c="close" aria-label="Enrere">‹</button><span class="dcmsg">Enfoca el full sencer</span></div>
+    <div class="dcbot"><label class="dcauto"><input type="checkbox" checked> Automàtic</label><button type="button" class="dcshot" data-c="shot" aria-label="Fer la foto"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg></button><span class="dcsp"></span></div>`;
   document.body.appendChild(ov);
   const video=ov.querySelector("video"); video.srcObject=stream; try{ await video.play(); }catch{}
-  const stop=()=>{ try{ stream.getTracks().forEach(t=>t.stop()); }catch{} ov.remove(); };
+  const poly=ov.querySelector(".dclive polygon"), msg=ov.querySelector(".dcmsg"), shot=ov.querySelector(".dcshot"), autoChk=ov.querySelector(".dcauto input");
+  try{ autoChk.checked=localStorage.getItem("lloguers-autoscan")!=="0"; }catch{}
+  autoChk.addEventListener("change", ()=>{ try{ localStorage.setItem("lloguers-autoscan", autoChk.checked?"1":"0"); }catch{} });
+  let live=true, lastQ=null, stable=0, liveQ=null, busy=false;
+  const vis=()=>{ const VW=video.videoWidth, VH=video.videoHeight, vr=video.getBoundingClientRect(), k=Math.max(vr.width/VW, vr.height/VH);
+    const fw=Math.min(1,(vr.width/k)/VW), fh=Math.min(1,(vr.height/k)/VH); return {VW,VH,vr,fw,fh,fx:(1-fw)/2,fy:(1-fh)/2}; };
+  const small=document.createElement("canvas");
+  const tick=()=>{ if(!live) return; if(busy||!video.videoWidth||ov.style.visibility==="hidden"){ setTimeout(tick,200); return; }
+    const V=vis(), sw=V.VW*V.fw, sh=V.VH*V.fh, k=260/Math.max(sw,sh); small.width=Math.round(sw*k); small.height=Math.round(sh*k);
+    small.getContext("2d").drawImage(video, V.VW*V.fx, V.VH*V.fy, sw, sh, 0, 0, small.width, small.height);
+    const q=dsDetect(small,{max:260,strict:true});
+    if(q){ const pts=q.map(([x,y])=>[x/small.width*V.vr.width, y/small.height*V.vr.height]); poly.setAttribute("points", pts.map(p=>p.join(",")).join(" ")); poly.style.opacity=1;
+      liveQ=q.map(([x,y])=>[x/small.width, y/small.height]);
+      const mv=lastQ?Math.max(...q.map((p,i)=>Math.hypot(p[0]-lastQ[i][0],p[1]-lastQ[i][1])))/Math.max(small.width,small.height):1;
+      stable = mv<0.025 ? stable+1 : 0; lastQ=q;
+      if(autoChk.checked){ msg.textContent = stable>=2 ? "Quiet… faig la foto" : "Full trobat · aguanta el mòbil quiet"; ov.classList.toggle("ready", stable>=2);
+        if(stable>=5){ stable=0; shot.click(); } }
+      else msg.textContent="Full trobat · fes la foto";
+    } else { poly.style.opacity=0; stable=0; lastQ=null; liveQ=null; ov.classList.remove("ready"); msg.textContent="Enfoca el full sencer"; }
+    setTimeout(tick, 180); };
+  setTimeout(tick, 500);
+  const stop=()=>{ live=false; try{ stream.getTracks().forEach(t=>t.stop()); }catch{} ov.remove(); };
   return new Promise(resolve=>{
     const onBack=()=>{ history.state&&history.state.dcam&&history.back(); };
     history.pushState({dcam:1}, ""); const pop=()=>{ window.removeEventListener("popstate",pop); document.querySelectorAll(".dscan").forEach(x=>x.remove()); stop(); resolve(null); }; window.addEventListener("popstate", pop);
     ov.addEventListener("click", async e=>{ const b=e.target.closest("[data-c]"); if(!b) return;
       if(b.dataset.c==="close"){ onBack(); return; }
-      b.disabled=true;
+      if(busy) return; busy=true; b.disabled=true; ov.classList.add("flash"); setTimeout(()=>ov.classList.remove("flash"),250);
       // Només la part que es veia a la pantalla (el vídeo es mostra retallat per omplir-la).
-      const VW=video.videoWidth, VH=video.videoHeight, vr=video.getBoundingClientRect(), k=Math.max(vr.width/VW, vr.height/VH);
-      const fw=Math.min(1,(vr.width/k)/VW), fh=Math.min(1,(vr.height/k)/VH), fx=(1-fw)/2, fy=(1-fh)/2;
+      const V=vis(), VW=V.VW, VH=V.VH, fw=V.fw, fh=V.fh, fx=V.fx, fy=V.fy, keepQ=liveQ;
       const crop=(src,sw,sh)=>{ const c=document.createElement("canvas"); c.width=Math.round(sw*fw); c.height=Math.round(sh*fh); c.getContext("2d").drawImage(src, sw*fx, sh*fy, sw*fw, sh*fh, 0, 0, c.width, c.height); return c; };
       let cv=null;
       try{ if(window.ImageCapture){ const blob=await new ImageCapture(track).takePhoto(); const full=await fileToCanvas(blob);
@@ -2261,8 +2290,8 @@ async function camScan(){
         if(Math.abs(full.width/full.height - VW/VH) < 0.03) cv=crop(full, full.width, full.height); } }catch{}
       if(!cv) cv=crop(video, VW, VH);
       ov.style.visibility="hidden";
-      const r=await dsCrop(cv, {retake:true});
-      if(r==="retake"){ ov.style.visibility=""; b.disabled=false; return; }
+      const r=await dsCrop(cv, {retake:true, q: keepQ ? keepQ.map(([x,y])=>[x*cv.width, y*cv.height]) : null});
+      if(r==="retake"){ ov.style.visibility=""; b.disabled=false; busy=false; stable=0; lastQ=null; return; }
       window.removeEventListener("popstate",pop); if(history.state&&history.state.dcam) history.back(); stop(); resolve(r);
     });
   });
