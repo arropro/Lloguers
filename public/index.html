@@ -510,6 +510,17 @@ details.folder{box-shadow:var(--shadow)}
 .dscan svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}.dscan polygon{fill:rgb(255 194 61 / .14);stroke:#FFC23D;stroke-width:2.5}
 .dscan .dspt{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #fff;background:#FFC23D;box-shadow:0 2px 10px #0008;touch-action:none;padding:0;cursor:grab}
 .dscan .dsact{display:flex;gap:8px;padding-top:12px}.dscan .dsact .btn{flex:1}
+.dscan .dsh{flex-direction:row!important;align-items:center;gap:10px}.dscan .dsh>div{display:flex;flex-direction:column;gap:2px}
+.dsback{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid rgb(255 255 255 / .25);background:rgb(255 255 255 / .08);color:#fff;font-size:26px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0 0 3px}
+.dscan .btn.ghost{color:#fff;border-color:rgb(255 255 255 / .3)}
+.dcam{position:fixed;inset:0;z-index:1990;background:#000;color:#fff}
+.dcam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.dcam .dcframe{position:absolute;left:7%;right:7%;top:14%;bottom:20%;border:2px dashed rgb(255 255 255 / .7);border-radius:14px;pointer-events:none}
+.dcam .dctop{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 12px;background:linear-gradient(#000a,#0000);font-size:.9rem}
+.dcam .dcbot{position:absolute;left:0;right:0;bottom:0;display:grid;place-items:center;padding:16px 0 calc(env(safe-area-inset-bottom,0px) + 24px);background:linear-gradient(#0000,#000a)}
+.dcam .dcshot{width:74px;height:74px;border-radius:50%;border:5px solid #fff;background:#FFC23D;box-shadow:0 0 0 3px #0006;cursor:pointer}
+.dcam .dcshot:disabled{opacity:.5}
+
 
 .panel.gestor{display:flex;flex-direction:column;gap:8px}
 .gbtn{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2,var(--surface));color:var(--ink);cursor:pointer;font:inherit}
@@ -2135,43 +2146,78 @@ function dsWarp(cv, q){
   for(let i=0;i<o.length;i+=4){ for(let c=0;c<3;c++){ let v=(o[i+c]-lo)*sc; o[i+c]=v<0?0:v>255?255:v; } }
   ox.putImageData(od,0,0); return out;
 }
-function docScan(file){
-  return new Promise(async resolve=>{
-    let cv, q;
-    try{
-      const bmp=await loadBitmap(file);
-      const bw=bmp.width||bmp.naturalWidth, bh=bmp.height||bmp.naturalHeight, k=Math.min(1, 2600/Math.max(bw,bh));
-      cv=document.createElement("canvas"); cv.width=Math.round(bw*k); cv.height=Math.round(bh*k); cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
-      if(bmp.close) bmp.close();
-      q=dsDetect(cv);
-    }catch(err){ toast("No he pogut preparar l'escàner ("+((err&&err.message)||"error")+"). Llegeixo la foto tal qual."); resolve(file); return; }
+async function fileToCanvas(file){
+  const bmp=await loadBitmap(file);
+  const bw=bmp.width||bmp.naturalWidth, bh=bmp.height||bmp.naturalHeight, k=Math.min(1, 2600/Math.max(bw,bh));
+  const cv=document.createElement("canvas"); cv.width=Math.round(bw*k); cv.height=Math.round(bh*k); cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+  if(bmp.close) bmp.close();
+  return cv;
+}
+const dsName = () => { const n=new Date(); return `Escaneig ${n.toLocaleDateString("sv-SE")} ${String(n.getHours()).padStart(2,"0")}${String(n.getMinutes()).padStart(2,"0")}.jpg`; };
+const canvasFile = async (cv, q=0.9) => new File([await new Promise(r=>cv.toBlob(r,"image/jpeg",q))], dsName(), {type:"image/jpeg"});
+// Pantalla per ajustar les cantonades. Torna un File, null (cancel·lat) o "retake" (tornar a fer la foto).
+function dsCrop(cv, opts={}){
+  return new Promise(resolve=>{
+    let q=dsDetect(cv);
     const ov=document.createElement("div"); ov.className="dscan"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","Retallar el document");
-    ov.innerHTML=`<div class="dsh"><b>Ajusta les cantonades del full</b><span>Arrossega els punts grocs fins a les puntes del paper</span></div>
+    ov.innerHTML=`<div class="dsh"><button type="button" class="dsback" data-ds="${opts.retake?"retake":"cancel"}" aria-label="Enrere">‹</button><div><b>Ajusta les cantonades del full</b><span>Arrossega els punts grocs fins a les puntes del paper</span></div></div>
       <div class="dsstage"><div class="dsbox"><img alt=""><svg><polygon/></svg>${[0,1,2,3].map(i=>`<button type="button" class="dspt" data-i="${i}" aria-label="Cantonada ${i+1}"></button>`).join("")}</div></div>
-      <div class="dsact"><button type="button" class="btn ghost" data-ds="cancel">Cancel·lar</button><button type="button" class="btn" data-ds="raw">Sense retallar</button><button type="button" class="btn primary" data-ds="ok">Fet</button></div>`;
+      <div class="dsact">${opts.retake?`<button type="button" class="btn ghost" data-ds="retake">Tornar a fer</button>`:`<button type="button" class="btn ghost" data-ds="cancel">Cancel·lar</button>`}<button type="button" class="btn" data-ds="raw">Sense retallar</button><button type="button" class="btn primary" data-ds="ok">Fet</button></div>`;
     document.body.appendChild(ov);
     const img=ov.querySelector("img"), box=ov.querySelector(".dsbox"), poly=ov.querySelector("polygon"), pts=[...ov.querySelectorAll(".dspt")], stage=ov.querySelector(".dsstage");
-    img.src=cv.toDataURL("image/jpeg",0.8);
     let f=1;
-    const layout=()=>{ const r=stage.getBoundingClientRect(); f=Math.min(r.width/cv.width, r.height/cv.height); box.style.width=cv.width*f+"px"; box.style.height=cv.height*f+"px"; draw(); };
     const draw=()=>{ poly.setAttribute("points", q.map(p=>p[0]*f+","+p[1]*f).join(" ")); pts.forEach((el,i)=>{ el.style.left=q[i][0]*f+"px"; el.style.top=q[i][1]*f+"px"; }); };
-    img.onload=layout; if(img.complete) setTimeout(layout,0); setTimeout(layout,300); window.addEventListener("resize", layout);
+    const layout=()=>{ const r=stage.getBoundingClientRect(); if(!r.width) return; f=Math.min(r.width/cv.width, r.height/cv.height); box.style.width=cv.width*f+"px"; box.style.height=cv.height*f+"px"; draw(); };
+    img.onload=layout; img.src=cv.toDataURL("image/jpeg",0.8); setTimeout(layout,0); setTimeout(layout,300); window.addEventListener("resize", layout);
     pts.forEach(el=>{ el.addEventListener("pointerdown", e=>{ e.preventDefault(); el.setPointerCapture(e.pointerId); const i=+el.dataset.i;
       const mv=ev=>{ const r=box.getBoundingClientRect(); q[i]=[Math.min(cv.width,Math.max(0,(ev.clientX-r.left)/f)), Math.min(cv.height,Math.max(0,(ev.clientY-r.top)/f))]; draw(); };
       const up=()=>{ el.removeEventListener("pointermove",mv); el.removeEventListener("pointerup",up); el.removeEventListener("pointercancel",up); };
       el.addEventListener("pointermove",mv); el.addEventListener("pointerup",up); el.addEventListener("pointercancel",up); }); });
     const close=v=>{ window.removeEventListener("resize", layout); ov.remove(); resolve(v); };
-    ov.addEventListener("click", async e=>{ const a=e.target.closest("[data-ds]"); if(!a) return; const k2=a.dataset.ds;
-      if(k2==="cancel") return close(null);
-      if(k2==="raw") return close(file);
+    ov.addEventListener("click", async e=>{ const a=e.target.closest("[data-ds]"); if(!a) return; const k=a.dataset.ds;
+      if(k==="cancel") return close(null);
+      if(k==="retake") return close("retake");
       a.disabled=true; a.textContent="Preparant…"; await new Promise(r=>setTimeout(r,30));
-      try{ const out=dsWarp(cv,q); const blob=await new Promise(r=>out.toBlob(r,"image/jpeg",0.88));
-        const n=new Date(), nm=`Escaneig ${n.toLocaleDateString("sv-SE")} ${String(n.getHours()).padStart(2,"0")}${String(n.getMinutes()).padStart(2,"0")}.jpg`;
-        close(new File([blob], nm, {type:"image/jpeg"})); }
-      catch{ close(file); } });
+      try{ if(k==="raw") return close(opts.raw || await canvasFile(cv)); close(await canvasFile(dsWarp(cv,q),0.88)); }
+      catch{ close(opts.raw || null); } });
   });
 }
-
+// Foto triada des d'un fitxer o de la càmera del mòbil.
+async function docScan(file){
+  let cv; try{ cv=await fileToCanvas(file); }catch(err){ toast("No he pogut preparar l'escàner. Llegeixo la foto tal qual."); return file; }
+  return dsCrop(cv, {raw:file});
+}
+// Càmera dins de l'app: sempre la de darrere, amb botó per tornar enrere i per repetir la foto.
+async function camScan(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return undefined;
+  let stream;
+  const tries=[{facingMode:{exact:"environment"}, width:{ideal:3840}, height:{ideal:2160}}, {facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1080}}];
+  for(const v of tries){ try{ stream=await navigator.mediaDevices.getUserMedia({video:v, audio:false}); break; }catch(e){ if(e && (e.name==="NotAllowedError"||e.name==="SecurityError")){ toast("No tinc permís per fer servir la càmera. Activa'l a la configuració del navegador."); return null; } } }
+  if(!stream) return undefined;
+  const track=stream.getVideoTracks()[0];
+  const ov=document.createElement("div"); ov.className="dcam"; ov.setAttribute("role","dialog"); ov.setAttribute("aria-label","Càmera");
+  ov.innerHTML=`<video playsinline autoplay muted></video><div class="dcframe" aria-hidden="true"></div>
+    <div class="dctop"><button type="button" class="dsback" data-c="close" aria-label="Enrere">‹</button><span>Enquadra el full sencer i fes la foto</span></div>
+    <div class="dcbot"><button type="button" class="dcshot" data-c="shot" aria-label="Fer la foto"></button></div>`;
+  document.body.appendChild(ov);
+  const video=ov.querySelector("video"); video.srcObject=stream; try{ await video.play(); }catch{}
+  const stop=()=>{ try{ stream.getTracks().forEach(t=>t.stop()); }catch{} ov.remove(); };
+  return new Promise(resolve=>{
+    const onBack=()=>{ history.state&&history.state.dcam&&history.back(); };
+    history.pushState({dcam:1}, ""); const pop=()=>{ window.removeEventListener("popstate",pop); document.querySelectorAll(".dscan").forEach(x=>x.remove()); stop(); resolve(null); }; window.addEventListener("popstate", pop);
+    ov.addEventListener("click", async e=>{ const b=e.target.closest("[data-c]"); if(!b) return;
+      if(b.dataset.c==="close"){ onBack(); return; }
+      b.disabled=true;
+      let cv=null;
+      try{ if(window.ImageCapture){ const blob=await new ImageCapture(track).takePhoto(); cv=await fileToCanvas(blob); } }catch{}
+      if(!cv){ cv=document.createElement("canvas"); cv.width=video.videoWidth; cv.height=video.videoHeight; cv.getContext("2d").drawImage(video,0,0); }
+      ov.style.visibility="hidden";
+      const r=await dsCrop(cv, {retake:true});
+      if(r==="retake"){ ov.style.visibility=""; b.disabled=false; return; }
+      window.removeEventListener("popstate",pop); if(history.state&&history.state.dcam) history.back(); stop(); resolve(r);
+    });
+  });
+}
 /* ================= files & AI ================= */
 function loadScript(src){ return new Promise((res,rej)=>{ if(document.querySelector(`script[src="${src}"]`)) return res(); const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 async function loadPdf(file){
@@ -2234,6 +2280,12 @@ function scanPick(pid){
   </div>`, "Tanca");
   if(!IMP.running && !IMP.saving){ IMP.items=IMP.items.filter(x=>["pending","reading"].includes(x.status)); SCANCTX.count=0; SCANCTX.last=""; IMP.skipped=0; }
   scanCount();
+  { const cam=$("#sc-cam"); if(cam) cam.addEventListener("click", async e=>{ if(cam.dataset.native==="1"){ delete cam.dataset.native; return; }
+      if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const r=await camScan();
+      if(r===undefined){ toast("No he pogut obrir la càmera aquí. Toca Foto una altra vegada per fer-la amb l'app de càmera."); cam.dataset.native="1"; return; }
+      if(r) startImport([{file:r, path:r.name}]); }, true); }
   ["#sc-cam","#sc-files","#sc-dir","#sc-files2"].forEach(sel=>{ const el=$(sel); if(!el) return; el.addEventListener("click", ()=>{
     let opened=false; const mark=()=>{ opened=true; }; window.addEventListener("blur", mark, {once:true}); document.addEventListener("visibilitychange", mark, {once:true}); el.addEventListener("change", mark, {once:true});
     setTimeout(()=>{ window.removeEventListener("blur", mark); document.removeEventListener("visibilitychange", mark); if(!opened && document.hasFocus()){ const n=$("#sc-nopick"); if(n) n.hidden=false; } }, 1500); }); });
