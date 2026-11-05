@@ -1091,7 +1091,7 @@ function viewResum(){
     ${chart12(vm)}
     ${yearLine(vm)}
   </section>
-  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestorGo"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b><small>Excel i factures del ${+today().slice(0,4)-1} de tots els pisos, en un sol fitxer</small></span></button><button type="button" class="glink" data-act="gestor">Canviar l'any o els pisos</button></section>`;
+  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b><small>Tria l'any i et preparo l'Excel amb totes les factures, en un sol fitxer</small></span></button></section>`;
 }
 const CHEV=`<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 const todoLi = x => x.fold ? `<li class="tfold"><details class="fold" data-fold="todo-docs"${S.open.has("todo-docs")?" open":""}><summary><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${CHEV}</summary><ul class="todo sub">${x.sub}</ul></details></li>` : `<li><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${x.act}</li>`;
@@ -1327,7 +1327,7 @@ function gestorForm(auto){
     <div class="field"><span>Pisos</span><div class="form" style="gap:6px">${ps.map(p=>{ const on=!!(p.purchaseDate||contractsOf(p.id).length); return `<label class="chk"><input type="checkbox" name="p" value="${p.id}" ${on?"checked":""}> ${esc(p.name)}</label>`; }).join("")}</div></div>
     <p class="small muted">Prepararé un fitxer ZIP amb un Excel (resum per pis, tots els moviments, contractes i el que falta) i una carpeta per pis amb les factures i rebuts de l'any, els contractes, l'escriptura i els documents de la hipoteca.</p>
     <div id="g-st" class="note" hidden></div>
-    <div class="actions"><button class="btn primary" id="g-go">Preparar i descarregar</button></div></form>`);
+    <div class="actions"><button class="btn primary" id="g-go">Generar l'Excel</button></div></form>`);
   $("#f-gest").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target); const y=+fd.get("year"), pids=fd.getAll("p"); if(!pids.length){ toast("Tria almenys un pis."); return; } await gestorBuild(y, pids); };
   if(auto) $("#f-gest").requestSubmit();
 }
