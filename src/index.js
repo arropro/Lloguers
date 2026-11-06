@@ -219,7 +219,7 @@ async function currentIcon(env) {
   return DEFAULT_ICON;
 }
 function manifest(icon) {
-  const v = "?i=" + icon;
+  const v = "?i=" + icon + "&v=2";
   return JSON.stringify({
     name: "Els meus lloguers", short_name: "Lloguers", description: "Gestió dels meus pisos de lloguer", lang: "ca",
     id: "/", start_url: "/", scope: "/", display: "standalone", background_color: ICON_BG[icon] || "#0B1430", theme_color: "#0B1430",
