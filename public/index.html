@@ -534,6 +534,7 @@ details.folder{box-shadow:var(--shadow)}
 .paylink{margin-left:6px;font-size:.85rem;white-space:nowrap}
 .pen{background:none;border:0;padding:0 0 0 4px;color:var(--muted);cursor:pointer;vertical-align:-2px;display:inline-flex}.pen svg{width:14px;height:14px}.pen:hover{color:var(--ink)}
 .radios{display:grid;gap:10px}
+#per-revisar{scroll-margin-top:90px}#per-revisar.pulse{animation:pulse 1.6s ease}@keyframes pulse{0%,60%{box-shadow:0 0 0 3px var(--gold)}100%{box-shadow:0 0 0 0 transparent}}
 .toast .tundo{margin-left:12px;background:none;border:0;color:var(--gold);font:inherit;font-weight:700;cursor:pointer;padding:4px 6px}
 .toast{pointer-events:auto}
 .btn.tgl{width:100%;justify-content:center}.btn.tgl[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:#1A1405}
@@ -1112,7 +1113,7 @@ function viewResum(){
     <div style="position:relative">
       ${(()=>{ const fixP=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+fixP, othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
         const fl=Math.round((expected+othInc-outOp-hip)*100)/100;
-        return `<div class="htop"><span class="eyebrow">${monthName(m)} ${m.slice(0,4)}</span>${todo.length?`<a class="hchip" href="#per-revisar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>${todo.length} avís${todo.length===1?"":"os"}</a>`:`<span class="hchip ok">Tot en ordre</span>`}<button type="button" class="eyeb" data-act="privToggle" aria-pressed="${document.body.classList.contains("priv")}" title="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}" aria-label="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}">${document.body.classList.contains("priv")?EYE_OFF:EYE_ON}</button></div>
+        return `<div class="htop"><span class="eyebrow">${monthName(m)} ${m.slice(0,4)}</span>${todo.length?`<a class="hchip" href="#per-revisar" data-act="goTodo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>${todo.length} avís${todo.length===1?"":"os"}</a>`:`<span class="hchip ok">Tot en ordre</span>`}<button type="button" class="eyeb" data-act="privToggle" aria-pressed="${document.body.classList.contains("priv")}" title="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}" aria-label="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}">${document.body.classList.contains("priv")?EYE_OFF:EYE_ON}</button></div>
       <div class="bigl">Aquest mes et quedaran</div>
       <div class="big ${fl<0?"neg":""}">${eur(fl)}</div>
       <div class="hsub">${fl<0?"Aquest mes gastaràs més del que cobraràs":"És el que et queda dels lloguers després de pagar totes les despeses i rebuts del mes i la hipoteca"}</div>`; })()}
@@ -3202,6 +3203,9 @@ const ACT = {
   newContract: id => contractForm({}, id), editContract: id => contractForm(conById(id)), delContract, endContract: id => endContractForm(id),
   editMortgage: id => mortgageForm(id),
   privToggle: () => { const on=!document.body.classList.contains("priv"); document.body.classList.toggle("priv", on); try{ localStorage.setItem("lloguers-priv", on?"1":""); }catch{} render(); },
+  goTodo: () => { const el=document.getElementById("per-revisar"); if(!el) return; const top=(document.querySelector(".mtop")?.getBoundingClientRect().height||0)+12;
+    window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - top, behavior:"smooth"});
+    el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); },
   fixedReview: () => { const p=sortedProps()[0]; if(!p) return; S.view="props"; S.propId=p.id; S.tab="resum"; closeSheet(); render(); go(); setTimeout(()=>{ const el=document.querySelector(".fixl, [data-act=fixedSuggest]"); el&&el.scrollIntoView({behavior:"smooth",block:"center"}); },150); },
   fixedReviewed: () => { try{ localStorage.setItem("lloguers-fixed-review", today().slice(0,4)); }catch{} sortedProps().forEach(p=>db.doc("props/"+p.id).update({fixedReviewed:today().slice(0,4)}).catch(()=>{})); toast("Perfecte!"); render(); },
   fixedEdit: key => fixedForm(key), fixedSuggest: id => fixedSuggest(id),
