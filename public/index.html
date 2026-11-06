@@ -531,6 +531,11 @@ details.folder{box-shadow:var(--shadow)}
 
 
 .panel.gestor{display:flex;flex-direction:column;gap:8px}
+.paylink{margin-left:6px;font-size:.85rem;white-space:nowrap}
+.pen{background:none;border:0;padding:0 0 0 4px;color:var(--muted);cursor:pointer;vertical-align:-2px;display:inline-flex}.pen svg{width:14px;height:14px}.pen:hover{color:var(--ink)}
+.radios{display:grid;gap:10px}
+.fixl .srow{grid-template-columns:1fr auto}.fixtot{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:10px 2px 4px;border-top:1px solid var(--line);margin-top:6px}.fixtot b{margin-left:auto}
+.sugrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.sugrow .t{flex:1;min-width:0}.sugamt{width:96px;text-align:right;flex:none}
 .gbtn{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2,var(--surface));color:var(--ink);cursor:pointer;font:inherit}
 .gbtn:hover{border-color:var(--gold)}.gbtn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .gbtn .gic{flex:none;width:42px;height:42px;border-radius:12px;background:var(--gold);color:#1A1405;display:grid;place-items:center}.gbtn .gic svg{width:22px;height:22px}
@@ -1077,7 +1082,8 @@ function viewResum(){
   const askRent = dom>=7 ? cur.filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)) : [];
   if(dom>=15) cur.forEach(c=>{ if(!rentPaid(c,m) && !(c.unpaid||[]).includes(m)) todo.push({k:"bad", chip:"Cobrament", t:`<b>${esc(c.tenantName||"Inquilí")}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Lloguer de ${monthName(m)} no anotat · ${eur(split(c).net)}</div>`, act:`<button class="btn sm primary" data-act="quickRent" data-id="${c.id}">Anotar cobrament</button>`}); });
   S.contracts.filter(c=>propById(c.propId) && cStatus(c)==="vigent" && c.end && daysBetween(td,c.end)<=60).forEach(c=>todo.push({k:"warn", chip:"Contracte", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Acaba el ${fmtDate(c.end)} (${daysBetween(td,c.end)} dies)</div>`, act:`<button class="btn sm" data-act="openContracts" data-id="${c.propId}">Veure</button>`}));
-  cur.forEach(c=>{ if(c.tenantType!=="empresa" && (+c.deposit||0)>0 && !c.incasol) todo.push({k:"warn", chip:"Fiança", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Fiança de ${eur(c.deposit)} sense marcar com a dipositada a l'organisme oficial</div>`, act:`<button class="btn sm primary" data-act="depositOk" data-id="${c.id}">Ja està dipositada</button><button class="btn sm" data-act="editContract" data-id="${c.id}">Revisar</button>`}); });
+  cur.forEach(c=>{ if(c.tenantType!=="empresa" && (+c.deposit||0)>0 && c.depositUnpaid) todo.push({k:"bad", chip:"Fiança", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">La fiança de ${eur(c.deposit)} no està pagada</div>`, act:`<button class="btn sm" data-act="depositForm" data-id="${c.id}">Canviar</button>`}); });
+  cur.forEach(c=>{ if(c.tenantType!=="empresa" && (+c.deposit||0)>0 && !c.incasol && !c.depositUnpaid) todo.push({k:"warn", chip:"Fiança", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Fiança de ${eur(c.deposit)} sense marcar com a dipositada a l'organisme oficial</div>`, act:`<button class="btn sm primary" data-act="depositOk" data-id="${c.id}">Ja està dipositada</button><button class="btn sm" data-act="editContract" data-id="${c.id}">Revisar</button>`}); });
   sortedProps().forEach(p=>{ const r=nextRenew(p.policyRenewal); if(r && daysBetween(td,r)<=30) todo.push({k:"warn", chip:"Assegurança", t:`<b>${esc(p.name)}</b><div class="small muted">La pòlissa${p.insurer?" de "+esc(p.insurer):""} venç el ${fmtDate(r)} (${daysBetween(td,r)} dies)</div>`, act:`<button class="btn sm primary" data-act="policyRenewed" data-id="${p.id}">Ja està renovada</button><button class="btn sm" data-act="openProp" data-id="${p.id}">Veure</button>`}); });
   sortedProps().forEach(p=>{ const M=mtg(p); if(M && !M.ok) todo.push({k:"warn", chip:"Hipoteca", t:`<b>${esc(p.name)}</b><div class="small muted">Les dades de la hipoteca no quadren: revisa la quota, el tipus o el termini</div>`, act:`<button class="btn sm" data-act="editMortgage" data-id="${p.id}">Revisar</button>`}); });
   sortedProps().filter(p=>!current(p.id).length && !isEmp(p) && !p.vacant).forEach(p=>todo.push({k:"", chip:"Sense contracte", t:`<b>${esc(p.name)}</b><div class="small muted">No hi ha cap contracte vigent. Si està llogat, afegeix el contracte; si no, digues-m'ho i no t'ho tornaré a preguntar.</div>`, act:`<button class="btn sm primary" data-act="newContract" data-id="${p.id}">Afegir contracte</button><button class="btn sm" data-act="propVacant" data-id="${p.id}">No està llogat</button>`}));
@@ -1096,7 +1102,7 @@ function viewResum(){
   return `${askPanel}
   <section class="hero hero2" aria-label="Aquest mes">
     <div style="position:relative">
-      ${(()=>{ const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma")), othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
+      ${(()=>{ const fixP=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+fixP, othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
         const fl=Math.round((expected+othInc-outOp-hip)*100)/100;
         return `<div class="htop"><span class="eyebrow">${monthName(m)} ${m.slice(0,4)}</span>${todo.length?`<a class="hchip" href="#per-revisar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>${todo.length} avís${todo.length===1?"":"os"}</a>`:`<span class="hchip ok">Tot en ordre</span>`}<button type="button" class="eyeb" data-act="privToggle" aria-pressed="${document.body.classList.contains("priv")}" title="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}" aria-label="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}">${document.body.classList.contains("priv")?EYE_OFF:EYE_ON}</button></div>
       <div class="bigl">Aquest mes et quedaran</div>
@@ -1109,7 +1115,7 @@ function viewResum(){
     <div class="hstats">
       <div><span class="label">Lloguers del mes</span><span class="num">${eur(expected)}</span><small>${cur.length} contracte${cur.length===1?"":"s"}${cur.some(c=>+c.feePct>0)?" · nets de comissió":""}</small></div>
       <div><span class="label">Lloguers cobrats</span><span class="num">${eur(cobrat)}</span><span class="hbar"><i style="width:${expected?Math.min(100,Math.round(cobrat/expected*100)):0}%"></i></span></div>
-      <div><span class="label">Despeses i hipoteca</span><span class="num">${eur(sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+hip)}</span><small>${(()=>{ const ex=sum(mm.filter(x=>x.type==="despesa"&&INVEST.includes(x.category))); const d=sum(mm.filter(x=>x.type==="despesa"&&x.category==="Derrama")); return [hip?`hipoteca ${eur(hip)}`:"sense hipoteca", ex?(d===ex?`derrama ${eur(d)}`:`extraordinàries ${eur(ex)}`):""].filter(Boolean).join(" · "); })()}</small></div>
+      <div><span class="label">Despeses i hipoteca</span><span class="num">${eur(sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0)+hip)}</span><small>${(()=>{ const fx=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const ex=sum(mm.filter(x=>x.type==="despesa"&&INVEST.includes(x.category))); const d=sum(mm.filter(x=>x.type==="despesa"&&x.category==="Derrama")); return [hip?`hipoteca ${eur(hip)}`:"sense hipoteca", fx?`previstes ${eur(fx)}`:"", ex?(d===ex?`derrama ${eur(d)}`:`extraordinàries ${eur(ex)}`):""].filter(Boolean).join(" · "); })()}</small></div>
     </div>
   </section>
   <section class="panel">
@@ -1127,6 +1133,7 @@ function viewResum(){
   </section>
   <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b><small>Tria l'any i et preparo l'Excel amb totes les factures, en un sol fitxer</small></span></button></section>`;
 }
+const PENCIL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg>`;
 const CHEV=`<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 const todoLi = x => x.fold ? `<li class="tfold"><details class="fold" data-fold="todo-docs"${S.open.has("todo-docs")?" open":""}><summary><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${CHEV}</summary><ul class="todo sub">${x.sub}</ul></details></li>` : `<li><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${x.act}</li>`;
 
@@ -1326,7 +1333,8 @@ function tabResum(p){
       ${Object.keys(inv).length||capY?`<tr class="sub"><td colspan="2">No són despeses de l'any</td></tr>${Object.entries(inv).map(([c,v])=>`<tr><td class="muted">${esc(c)} (s'amortitza)</td><td class="num">${eur(v)}</td></tr>`).join("")}${capY?`<tr><td class="muted">Capital d'hipoteca retornat</td><td class="num">${eur(capY)}</td></tr>`:""}`:""}
     </tbody></table>
     <details class="fold" data-fold="yn" style="margin-top:10px"${S.open.has("yn")?" open":""}><summary><span>Nota per a la renda</span>${CHEV}</summary><p class="small muted" style="margin-top:8px">Orientatiu per a la renda: els interessos de la hipoteca són deduïbles, el capital retornat no. L'amortització i el criteri final els ha de validar el teu gestor${M?"; per a la xifra exacta d'interessos, fes servir el certificat anual del banc":""}.</p></details>
-  </section>`;
+  </section>
+  ${fixedPanel(p)}`;
 }
 function mortgagePanel(p,k){
   const M=k.M;
@@ -1485,8 +1493,9 @@ function contractCard(c, full=true){
   else bar=`<div class="small">${c.start?"Des del "+fmtDate(c.start):"Sense data d'inici"}${c.end?" fins al "+fmtDate(c.end):" · sense data de final"}</div>`;
   let pays="";
   if(st!=="futur" && c.start){ const all=contractMonths(c, cm), unk=unknownMonths(c), bad=all.filter(mo=>payState(c,mo)==="unpaid"), paidN=all.filter(mo=>payState(c,mo)==="paid").length;
-    const msg = bad.length ? `<span class="neg">${bad.length} mes${bad.length>1?"os":""} sense cobrar (${esc(range(bad))})</span>` : unk.length ? `${unk.length} mes${unk.length>1?"os":""} sense anotar` : `<span class="pos">Al dia</span>`;
-    pays=`<div><span class="label">Cobraments</span><div class="paysum"><span>${msg}<span class="small muted"> · ${paidN} de ${all.length} mesos anotats</span></span><button class="btn sm ghost" data-act="payHistory" data-id="${c.id}">Historial</button></div>
+    const lastPaid=[...all].reverse().find(mo=>payState(c,mo)==="paid");
+    const msg = bad.length ? `<span class="neg">${bad.length} mes${bad.length>1?"os":""} sense cobrar (${esc(range(bad))})</span>` : unk.length ? `${unk.length} mes${unk.length>1?"os":""} sense anotar` : `<span class="pos">Tot cobrat${lastPaid?` fins ${/^[aeiou]/.test(monthName(lastPaid))?"a l'":"al "}${monthName(lastPaid)}`:""}</span>`;
+    pays=`<div><span class="label">Cobraments</span><div class="paysum"><span>${msg} <button class="crumb paylink" data-act="payHistory" data-id="${c.id}">Mes a mes ›</button></span></div>
       ${unk.length?`<p class="small" style="margin-top:6px"><button class="crumb" data-act="markAllPaid" data-id="${c.id}">Marcar-${unk.length>1?"los":"lo"} com a cobrat${unk.length>1?"s":""}</button></p>`:""}</div>`; }
   const hist=[...(c.rents||[])].filter(x=>x&&x.from).sort((a,b)=>b.from.localeCompare(a.from));
   const docs=(c.docs||[]);
@@ -1502,13 +1511,13 @@ function contractCard(c, full=true){
       ${(c.extras||[]).length||+c.feePct?`<div><span class="label">${isTotalMode(c)?"Cobres en total":"Cobres al mes"}</span><span class="num">${eur(isTotalMode(c)?contractTotal(c):rentAt(c,cm)+extrasOf(c,"mensual"))}</span>${+c.feePct?`<span class="small muted">${upfrontFee(c)?`comissió de ${esc(c.platform)}: ${eur(feeOn(c,contractRentTotal(c)))} (${String(c.feePct).replace(".",",")}% + IVA) al començament`:`et queden ${eur(split(c,cm).net)} després de la comissió`}</span>`:""}</div>`:""}
     </div>
     ${pays}
-    <div class="cact">${st==="vigent"&&!rentPaid(c,cm)?`<button class="btn sm primary" data-act="quickRent" data-id="${c.id}">Anotar cobrament de ${monthName(cm)}</button>`:""}<button class="btn sm" data-act="editContract" data-id="${c.id}">Editar contracte</button></div>
+    <div class="cact">${st==="vigent"&&!rentPaid(c,cm)?`<button class="btn sm primary" data-act="quickRent" data-id="${c.id}">✓ He cobrat ${/^[aeiou]/.test(monthName(cm))?"l'":"el "}${monthName(cm)}</button>`:""}<button class="btn sm" data-act="editContract" data-id="${c.id}">Editar contracte</button></div>
     <details class="fold" data-fold="c-${c.id}"${S.open.has("c-"+c.id)?" open":""}><summary><span>Més detalls${docs.length?` · ${docs.length} document${docs.length>1?"s":""}`:""}</span>${CHEV}</summary><div class="foldbody">
     ${c.firstEnd&&c.end&&c.firstEnd<c.end?`<span class="small muted">Primer període fins al ${fmtDate(c.firstEnd)}, després pròrrogues anuals fins al ${fmtDate(c.end)}</span>`:""}
     <div class="kv">
       ${hist.length?`<div><span class="label">Renda inicial</span><span class="num">${eur(c.rent)}</span></div>`:""}
       ${c.tenantType==="empresa"?`<div><span class="label">Plataforma</span><span>${esc(c.platform||"—")}</span>${+c.feePct?`<span class="small muted">comissió ${String(c.feePct).replace(".",",")}%</span>`:""}</div>`:
-        `<div><span class="label">Fiança</span><span class="num">${+c.deposit?eur(c.deposit):"—"}</span>${+c.deposit?`<span class="small ${c.incasol?"pos":"neg"}">${c.incasol?"Dipositada a l'organisme oficial":"Dipòsit oficial pendent"}</span>`:""}</div>`}
+        `<div><span class="label">Fiança <button type="button" class="pen" data-act="depositForm" data-id="${c.id}" title="Canviar l'estat de la fiança" aria-label="Canviar l'estat de la fiança">${PENCIL}</button></span><span class="num">${+c.deposit?eur(c.deposit):"—"}</span>${+c.deposit?`<span class="small ${c.depositUnpaid?"neg":c.incasol?"pos":"neg"}">${c.depositUnpaid?"No l'ha pagada":c.incasol?"Dipositada a l'organisme oficial":"Pagada · falta dipositar-la"}</span>`:""}</div>`}
       ${c.people?`<div><span class="label">Persones</span><span>${esc(c.people)}</span></div>`:""}
       ${c.phone||c.email?`<div><span class="label">Contacte</span><span class="cp"><span class="small selx" style="overflow-wrap:anywhere">${esc([c.phone,c.email].filter(Boolean).join(" · "))}</span>${copyBtn(c.phone)}</span></div>`:""}
     </div>
@@ -2068,10 +2077,10 @@ function moveForm(m={}, o={}){
   const fileBox = pendingFile ? `<div class="preview">${o.preview?`<img src="${o.preview}" alt="">`:`<div class="pdfph">PDF</div>`}<div class="small"><b>${esc(pendingFile.name||"Document")}</b><br><span class="muted">Es desarà amb el moviment</span></div></div>`
     : m.docId ? `<div class="preview">${String(m.docMime||"").startsWith("image/")?`<img src="/_blob/${esc(m.docId)}" alt="">`:`<div class="pdfph">PDF</div>`}<div class="small"><b>${esc(m.docName||"Document")}</b><br><button type="button" class="crumb" data-doc="${esc(m.docId)}" data-mime="${esc(m.docMime||"")}" data-name="${esc(m.docName||"")}">Obrir document</button></div></div>`
     : "";
-  openSheet(m.id?"Editar moviment":o.ai?"Revisa i desa":"Nou moviment", `<form class="form" id="f-move">
+  openSheet(o.title || (m.id?"Editar moviment":o.ai?"Revisa i desa":"Nou moviment"), `<form class="form" id="f-move">
     ${o.note?`<div class="note ${o.warn?"warn":""}">${esc(o.note)}</div>`:""}
     ${fileBox}
-    <div class="seg" role="radiogroup" aria-label="Tipus">
+    <div class="seg" role="radiogroup" aria-label="Tipus" ${o.only?"hidden":""}>
       <label><input type="radio" name="type" value="despesa" ${type==="despesa"?"checked":""}>Despesa</label>
       <label><input type="radio" name="type" value="ingres" ${type==="ingres"?"checked":""}>Ingrés</label></div>
     <div class="row2">${field("Data", `<input id="mf-date" type="date" name="date" required value="${esc(m.date||today())}">`)}${field("Import total (€)", amtIn("mf-amt","amount",m.amount,"0,00"))}</div>
@@ -2107,10 +2116,86 @@ function docName(d, mime){
   const p=propById(d.propId); const slug=s=>norm(s).replace(/ /g,"-").slice(0,24);
   return `${d.date}_${slug(p?p.name:"general")}_${slug(d.provider||d.category)}_${String(d.amount).replace(".",",")}€.${mime==="application/pdf"?"pdf":"jpg"}`;
 }
+
+/* ================= despeses fixes de l'any (per pis) ================= */
+const FREQS = {mensual:"Cada mes", trimestral:"Cada 3 mesos", semestral:"Cada 6 mesos", anual:"Un cop l'any"};
+const MONTHS_CA = ["gener","febrer","març","abril","maig","juny","juliol","agost","setembre","octubre","novembre","desembre"];
+function fixedMonths(it){ const m0=Math.min(12,Math.max(1,+it.month||1)); const step={mensual:1,trimestral:3,semestral:6,anual:12}[it.freq]||12; const out=[]; for(let k=0;k<12;k+=step) out.push(((m0-1+k)%12)+1); return out; }
+const fixedYear = it => (+it.amount||0)*fixedMonths(it).length;
+// Despeses fixes que toquen aquest mes i que encara no s'han anotat (si ja hi ha el rebut real, compta el real).
+function fixedPending(p, mo){
+  const mm=+mo.slice(5,7), ms=movesOf(p.id).filter(x=>x.type==="despesa"&&(x.period||ymOf(x.date))===mo);
+  return (p.fixed||[]).filter(it=>fixedMonths(it).includes(mm) && !ms.some(x=>x.category===it.category && (!it.concept || norm([x.concept,x.provider].join(" ")).includes(norm(it.concept).split(" ")[0]) || x.category!=="Altres despeses")));
+}
+function fixedPanel(p){
+  const its=p.fixed||[], tot=its.reduce((a,it)=>a+fixedYear(it),0);
+  return `<section class="panel"><div class="panel-h"><div><h3>Despeses fixes de l'any</h3><p class="small muted" style="margin:2px 0 0">Les que ja saps que arribaran. Cada mes es resten del que et queda, fins que n'escanegis el rebut real.</p></div></div>
+    ${its.length?`<ul class="slist fixl">${its.map((it,i)=>`<li class="srow click" data-act="fixedEdit" data-id="${p.id}|${i}"><div class="t"><b>${esc(it.concept||it.category)}</b><div class="small muted">${FREQS[it.freq]||""}${it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><span class="num">${eur(it.amount)}</span></li>`).join("")}</ul>
+      <div class="fixtot"><span>Total a l'any</span><b class="num">${eur(tot)}</b><span class="small muted">${eur(tot/12)}/mes de mitjana</span></div>`
+      :`<p class="small muted">Encara no n'hi ha cap. Pots afegir-les una a una o fer que les tregui dels moviments de l'any passat.</p>`}
+    <div class="cact"><button class="btn sm primary" data-act="fixedEdit" data-id="${p.id}|new">Afegir</button><button class="btn sm" data-act="fixedSuggest" data-id="${p.id}">Treure-les de l'any passat</button></div></section>`;
+}
+function fixedForm(key){
+  const [pid, idx]=String(key).split("|"), p=propById(pid); if(!p) return; const its=[...(p.fixed||[])], it=idx==="new"?{freq:"anual", month:+today().slice(5,7), category:"IBI i taxes"}:its[+idx]; if(!it) return;
+  const cats=CATS.despesa.filter(c=>!["Comissió plataforma","Despeses de compra"].includes(c));
+  openSheet(idx==="new"?"Nova despesa fixa":"Despesa fixa", `<form class="form" id="f-fix">
+    ${field("Concepte", `<input name="concept" value="${esc(it.concept||"")}" placeholder="IBI, comunitat, assegurança…">`)}
+    <div class="row2">${field("Categoria", `<select name="category">${opts(cats, it.category)}</select>`)}${field("Import de cada rebut (€)", amtIn("fx-amt","amount",it.amount))}</div>
+    <div class="row2">${field("Cada quan", `<select name="freq" id="fx-freq">${opts(Object.entries(FREQS), it.freq)}</select>`)}${field("Mes", `<select name="month" id="fx-month">${opts(MONTHS_CA.map((n,i)=>[String(i+1), n[0].toUpperCase()+n.slice(1)]), String(it.month||1))}</select>`)}</div>
+    <div class="actions">${idx!=="new"?`<button type="button" class="btn danger grow" id="fx-del">Esborrar</button>`:""}<button class="btn primary">Desar</button></div></form>`);
+  const f=$("#f-fix"), syncM=()=>{ $("#fx-month").closest(".field, label, div").style.visibility = f.freq.value==="mensual"?"hidden":""; }; syncM(); f.freq.addEventListener("change", syncM);
+  if($("#fx-del")) $("#fx-del").onclick=async()=>{ its.splice(+idx,1); if(await save(()=>db.doc("props/"+pid).update({fixed:its}),"Esborrada")) closeSheet(); };
+  f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f); const n={concept:fd.get("concept").trim(), category:fd.get("category"), amount:parseAmt(fd.get("amount")), freq:fd.get("freq"), month:+fd.get("month")||1};
+    if(!n.amount){ toast("Escriu l'import."); return; } if(idx==="new") its.push(n); else its[+idx]=n;
+    await save(()=>db.doc("props/"+pid).update({fixed:its}),"Desada"); };
+}
+function fixedSuggest(pid){
+  const p=propById(pid); if(!p) return; const to=curMonth(), from=addMonths(to,-12);
+  const ms=movesOf(pid).filter(x=>x.type==="despesa" && !INVEST.includes(x.category) && x.category!=="Comissió plataforma" && x.category!=="Reparació i manteniment" && (x.period||ymOf(x.date))>=from && (x.period||ymOf(x.date))<to);
+  const g={}; ms.forEach(x=>{ const k=x.category==="Altres despeses"||x.category==="Subministraments"?x.category+"|"+norm(x.provider).split(" ")[0]:x.category; (g[k]=g[k]||[]).push(x); });
+  const have=new Set((p.fixed||[]).map(it=>it.category+"|"+norm(it.concept)));
+  const sug=Object.values(g).map(list=>{ const months=[...new Set(list.map(x=>+(x.period||ymOf(x.date)).slice(5,7)))].sort((a,b)=>a-b), n=months.length, total=sum(list);
+    const freq = n>=9?"mensual": n>=4?"trimestral": n>=2?"semestral":"anual"; const times={mensual:12,trimestral:4,semestral:2,anual:1}[freq];
+    const x=list[list.length-1]; return {concept: x.category==="Comunitat"?"Comunitat":x.category==="IBI i taxes"?(x.concept||"IBI"):(x.provider||x.concept||x.category), category:x.category, amount:Math.round(total/times*100)/100, freq, month:months[0]||1}; })
+    .filter(it=>!have.has(it.category+"|"+norm(it.concept)));
+  if(!sug.length){ toast("No he trobat despeses repetides a l'últim any per a aquest pis."); return; }
+  openSheet("Despeses de l'any passat", `<form class="form" id="f-fsug"><p class="small muted" style="margin:0">He trobat aquestes despeses als últims 12 mesos. Marca les que es repetiran i corregeix l'import si cal.</p>
+    <ul class="slist">${sug.map((it,i)=>`<li class="sugrow"><label class="chk"><input type="checkbox" name="on" value="${i}" checked></label><div class="t"><b>${esc(it.concept)}</b><div class="small muted">${esc(it.category)} · ${FREQS[it.freq]}${it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><input class="amt sugamt" data-i="${i}" inputmode="decimal" value="${amtStr(it.amount)}" aria-label="Import de ${esc(it.concept)}"></li>`).join("")}</ul>
+    <div class="actions"><button class="btn primary">Afegir les marcades</button></div></form>`);
+  $("#f-fsug").onsubmit=async e=>{ e.preventDefault(); const on=new FormData(e.target).getAll("on").map(Number);
+    const add=on.map(i=>({...sug[i], amount:parseAmt($(`.sugamt[data-i="${i}"]`).value)||sug[i].amount}));
+    if(!add.length){ toast("No n'has marcat cap."); return; }
+    await save(()=>db.doc("props/"+pid).update({fixed:[...(p.fixed||[]), ...add]}), `${add.length} despes${add.length>1?"es afegides":"a afegida"}`); };
+}
+
 function quickRent(id){
-  const c=conById(id); if(!c) return; const m=curMonth(), r=split(c);
-  moveForm({type:"ingres", date:today(), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:m, provider:c.tenantName, concept:`Lloguer ${monthName(m)}${c.unitLabel&&c.unitLabel!=="Pis sencer"?" · "+c.unitLabel:""}`, vat:r.iva||""},
-    {note: r.net!==r.base ? `Renda ${eur(r.base)}${r.iva?` + IVA ${eur(r.iva)}`:""}${r.ret?` − retenció ${eur(r.ret)}`:""}${r.fee?` − comissió ${eur(r.fee)}`:""} = ${eur(r.net)} que hauries de rebre.` : ""});
+  const c=conById(id); if(!c) return; const m=curMonth(), r=split(c), extra=r.net-r.base;
+  openSheet(`${esc(propById(c.propId)?.name||"")} · ${monthName(m)}`, `<form class="form" id="f-qr">
+    <div class="seg" role="tablist" aria-label="Què vols anotar"><label><input type="radio" name="qk" value="cob" checked>Cobrament</label><label><input type="radio" name="qk" value="imp">Imprevist</label></div>
+    <p class="muted" style="margin:0">${esc(c.tenantName||"")} · lloguer de ${monthName(m)}</p>
+    ${r.net!==r.base?`<div class="note">Renda ${eur(r.base)}${r.iva?` + IVA ${eur(r.iva)}`:""}${r.ret?` − retenció ${eur(r.ret)}`:""}${r.fee?` − comissió ${eur(r.fee)}`:""} = ${eur(r.net)} que hauries de rebre.</div>`:""}
+    <div class="row2">${field("Import cobrat (€)", amtIn("qr-amt","amount",r.net))}${field("Data", `<input type="date" name="date" value="${today()}" required>`)}</div>
+    <label class="check"><input type="checkbox" id="qr-chg"> La renda ha canviat</label>
+    <div id="qr-new" hidden><div class="row2">${field("Renda nova (€/mes)", amtIn("qr-rent","newRent",""))}${field("Des de", `<input type="month" name="from" value="${m}">`)}</div>
+      <p class="small muted" style="margin:0">Es guardarà al contracte i es farà servir a partir d'aquest mes.</p></div>
+    <div class="actions"><button class="btn primary" id="qr-save">Desar</button></div></form>`);
+  const f=$("#f-qr");
+  f.addEventListener("change", e=>{
+    if(e.target.name==="qk" && e.target.value==="imp"){ closeSheet(); moveForm({type:"despesa", date:today(), propId:c.propId, contractId:c.id, category:"Reparació i manteniment"}, {only:"despesa", title:"Imprevist"}); return; }
+    if(e.target.id==="qr-chg"){ $("#qr-new").hidden=!e.target.checked; if(e.target.checked) $("#qr-rent").focus(); }
+  });
+  $("#qr-rent").addEventListener("input", ()=>{ const v=parseAmt($("#qr-rent").value); if(v>0) $("#qr-amt").value=amtStr(Math.round((v+extra)*100)/100); });
+  f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f), amount=parseAmt(fd.get("amount")); if(!amount){ toast("Escriu l'import."); return; }
+    const chg=$("#qr-chg").checked, nr=parseAmt(fd.get("newRent")), from=fd.get("from")||m;
+    if(chg && !(nr>0)){ toast("Escriu la renda nova."); $("#qr-rent").focus(); return; }
+    if(rentPaid(c,m) && !f.dataset.dupOk){ f.dataset.dupOk="1"; toast(`Ja hi ha un cobrament de ${monthName(m)}. Torna a prémer Desar si és correcte.`); return; }
+    $("#qr-save").disabled=true;
+    try{
+      if(chg){ const rents=[...(c.rents||[]).filter(x=>x&&x.from!==from), {from, amount:nr, note:"Canvi de renda"}].sort((a,b)=>a.from.localeCompare(b.from)); await db.doc("contracts/"+c.id).update({rents}); }
+      await db.collection("moves").add({type:"ingres", date:fd.get("date")||today(), amount, propId:c.propId, contractId:c.id, category:"Lloguer", period:m, concept:`Lloguer ${monthName(m)}${c.unitLabel&&c.unitLabel!=="Pis sencer"?" · "+c.unitLabel:""}`, provider:c.tenantName||"", vat:r.iva||0, source:"manual", createdAt:Date.now()});
+      if((c.unpaid||[]).includes(m)) await db.doc("contracts/"+c.id).update({unpaid:c.unpaid.filter(x=>x!==m)});
+      closeSheet(); toast(chg?`Cobrament desat i renda nova de ${eur(nr)}`:`${monthName(m)[0].toUpperCase()+monthName(m).slice(1)} cobrat`);
+    }catch{ $("#qr-save").disabled=false; toast("No s'ha pogut desar."); } };
 }
 
 /* ================= escàner de documents (foto de la càmera) ================= */
@@ -3105,6 +3190,13 @@ const ACT = {
   newContract: id => contractForm({}, id), editContract: id => contractForm(conById(id)), delContract, endContract: id => endContractForm(id),
   editMortgage: id => mortgageForm(id),
   privToggle: () => { const on=!document.body.classList.contains("priv"); document.body.classList.toggle("priv", on); try{ localStorage.setItem("lloguers-priv", on?"1":""); }catch{} render(); },
+  fixedEdit: key => fixedForm(key), fixedSuggest: id => fixedSuggest(id),
+  depositForm: id => { const c=conById(id); if(!c) return; const st=c.depositUnpaid?"no":c.incasol?"dip":"pag";
+    openSheet("Fiança", `<form class="form" id="f-dep">${field("Import (€)", amtIn("dp-amt","deposit",c.deposit))}
+      <div class="radios">${[["dip","Pagada i dipositada a l'organisme oficial"],["pag","Pagada, però falta dipositar-la"],["no","No l'ha pagada"]].map(([v,l])=>`<label class="check"><input type="radio" name="st" value="${v}" ${st===v?"checked":""}> ${l}</label>`).join("")}</div>
+      <div class="actions"><button class="btn primary">Desar</button></div></form>`);
+    $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
+      await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
   gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
   markUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:[...new Set([...(c.unpaid||[]), mo])]}); closeSheet(); toast(`${monthLabel(mo)} marcat com a no cobrat`); }catch{ toast("No s'ha pogut desar."); } },
