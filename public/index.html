@@ -739,6 +739,21 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
 .netpill .ni{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#7B5CFF,#4A2FD1);box-shadow:0 0 0 2px rgb(255 255 255 / .85),0 4px 14px -4px #6A4BF0;font-size:15px}
 .netpill .nt{font-weight:600}
 .netpill b{font-weight:800;font-size:1.05em;background:linear-gradient(90deg,#F2A31B,var(--in));-webkit-background-clip:text;background-clip:text;color:transparent}
+.mline{align-items:center;margin-top:10px}
+.mline .brk{display:none}
+.mline > span:not(.brk):not(.netpill){display:inline-flex;gap:6px;align-items:baseline}
+.mline small{font-size:inherit;color:inherit}
+.mline .tlead{color:var(--muted)}
+@media (max-width:640px){
+  .mline{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .mline .tlead{grid-column:1/-1;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  .mline > span:not(.brk):not(.netpill):not(.tlead){display:grid;gap:2px;padding:9px 12px;border-radius:14px;background:color-mix(in srgb,var(--line) 45%,transparent);border:1px solid var(--line)}
+  .mline small{font-size:.72rem;color:var(--muted)}
+  .mline b{font-size:.98rem;white-space:nowrap}
+  .mline .tinc{grid-column:1/-1}
+  .mline .netpill{grid-column:1/-1;justify-content:flex-start}
+  .mline .netpill b{margin-left:auto}
+}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1188,11 +1203,19 @@ const PENCIL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 const CHEV=`<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 const todoLi = x => x.fold ? `<li class="tfold"><details class="fold" data-fold="todo-docs"${S.open.has("todo-docs")?" open":""}><summary><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${CHEV}</summary><ul class="todo sub">${x.sub}</ul></details></li>` : `<li><span class="chip ${x.k}">${x.chip}</span><div class="t">${x.t}</div>${x.act}</li>`;
 
+
+/* Totals amb la mateixa regla a tot arreu: sense fiances ni despeses de compra, amb la hipoteca */
+function hipFor(props, y){
+  const end=curMonth(), a=y?y+"-01":"0000-00", b=y?(y+"-12"<end?y+"-12":end):end;
+  return sum(props, p=>{ const M=mtg(p); return M?mtgSum(M,a,b,"pay"):0; });
+}
+function moneyLine(list, hip, lead){
+  const inc=sum(list.filter(x=>x.type==="ingres"&&x.category!=="Fiança")), out=sum(list.filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra"));
+  return `<div class="totals mline">${lead?`<span class="tlead">${lead}</span>`:""}<span class="${hip?"tinc":""}"><small>Ingressos</small><b class="num pos">${eur(inc)}</b></span><span><small>Despeses</small><b class="num neg">${eur(out)}</b></span>${hip?`<span><small>Hipoteca</small><b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill" title="No compta les fiances ni les despeses de compra (notari, impostos…), però sí la hipoteca"><span class="ni">💰</span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
+}
 function yearLine(vm){
   const y=today().slice(0,4), ym=vm.filter(x=>String(x.date).startsWith(y));
-  const inc=sum(ym.filter(x=>x.type==="ingres")), out=sum(ym.filter(x=>x.type==="despesa" && x.category!=="Despeses de compra")), inv=sum(ym.filter(x=>x.type==="despesa" && x.category==="Despeses de compra"));
-  let hip=0; for(let mo=y+"-01"; mo<=curMonth(); mo=addMonths(mo,1)) hip+=mtgMonthAll(mo);
-  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill"><span class="ni">💰</span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
+  return moneyLine(ym, hipFor(S.props, y), "Any "+y);
 }
 
 function niceMax(v){ if(v<=0) return 100; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
@@ -1708,11 +1731,10 @@ function suppliesBlock(list){
 function tabMoves(p, ms){
   const y=S.py, years=[...new Set([today().slice(0,4), ...ms.map(x=>String(x.date).slice(0,4))])].sort().reverse();
   const list=ms.filter(x=>String(x.date).startsWith(y));
-  const inc=sum(list.filter(x=>x.type==="ingres")), out=sum(list.filter(x=>x.type==="despesa"));
   return `${suppliesBlock(list)}
   <section class="panel">
     <div class="panel-h"><h2>Moviments</h2><select class="sel" aria-label="Any" data-change="py">${years.map(v=>`<option ${v===y?"selected":""}>${v}</option>`).join("")}</select><button class="btn sm primary" data-act="newMove" data-id="${p.id}">Afegir moviment</button></div>
-    <div class="totals"><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span><span>Net <b class="num">${eur(inc-out)}</b></span></div>
+    ${moneyLine(list, hipFor([p], y))}
     ${isEmp(p)?empLedger(p,list):ledger(list,false)}
   </section>`;
 }
@@ -1730,7 +1752,7 @@ function viewMoves(){
   const f=S.f, vm=VM();
   const years=[...new Set([today().slice(0,4), ...vm.map(x=>String(x.date).slice(0,4))])].sort().reverse();
   const list=vm.filter(x=>(!f.year||String(x.date).startsWith(f.year)) && (!f.prop || (f.prop==="__none"?!x.propId:x.propId===f.prop)) && (!f.type||x.type===f.type||(f.type==="doc"&&x.docId)));
-  const inc=sum(list.filter(x=>x.type==="ingres")), out=sum(list.filter(x=>x.type==="despesa"));
+  const hip = f.type==="ingres"||f.type==="doc"||f.prop==="__none" ? 0 : hipFor(f.prop?S.props.filter(p=>p.id===f.prop):S.props, f.year);
   return `<section class="panel">
     <div class="panel-h"><h2>Moviments</h2><button class="btn primary sm" data-act="newMove">Afegir a mà</button></div>
     <div class="filters">
@@ -1738,7 +1760,7 @@ function viewMoves(){
       <select aria-label="Pis" data-change="prop"><option value="">Tots els pisos</option>${sortedProps().map(p=>`<option value="${p.id}" ${p.id===f.prop?"selected":""}>${esc(p.name)}</option>`).join("")}<option value="__none" ${f.prop==="__none"?"selected":""}>Sense pis</option></select>
       <select aria-label="Tipus" data-change="type"><option value="">Ingressos i despeses</option><option value="ingres" ${f.type==="ingres"?"selected":""}>Només ingressos</option><option value="despesa" ${f.type==="despesa"?"selected":""}>Només despeses</option><option value="doc" ${f.type==="doc"?"selected":""}>Amb document</option></select>
     </div>
-    <div class="totals"><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span><span>Net <b class="num">${eur(inc-out)}</b></span></div>
+    ${moneyLine(list, hip)}
     ${ledger(list)}
   </section>`;
 }
