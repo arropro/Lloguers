@@ -534,6 +534,11 @@ details.folder{box-shadow:var(--shadow)}
 .paylink{margin-left:6px;font-size:.85rem;white-space:nowrap}
 .pen{background:none;border:0;padding:0 0 0 4px;color:var(--muted);cursor:pointer;vertical-align:-2px;display:inline-flex}.pen svg{width:14px;height:14px}.pen:hover{color:var(--ink)}
 .radios{display:grid;gap:10px}
+.toast .tundo{margin-left:12px;background:none;border:0;color:var(--gold);font:inherit;font-weight:700;cursor:pointer;padding:4px 6px}
+.toast{pointer-events:auto}
+.btn.tgl{width:100%;justify-content:center}.btn.tgl[aria-pressed="true"]{background:var(--gold);border-color:var(--gold);color:#1A1405}
+.fixl{list-style:none;margin:0;padding:0}.fixl li{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}.fixl .t{flex:1;min-width:0}
+.ib{flex:none;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer;font-size:20px;line-height:1;padding:0}.ib svg{width:16px;height:16px}.ib:hover{color:var(--ink)}.ib.del:hover{color:var(--neg,#C2412D)}
 .fixl .srow{grid-template-columns:1fr auto}.fixtot{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:10px 2px 4px;border-top:1px solid var(--line);margin-top:6px}.fixtot b{margin-left:auto}
 .sugrow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.sugrow .t{flex:1;min-width:0}.sugamt{width:96px;text-align:right;flex:none}
 .gbtn{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface-2,var(--surface));color:var(--ink);cursor:pointer;font:inherit}
@@ -1082,6 +1087,9 @@ function viewResum(){
   const askRent = dom>=7 ? cur.filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)) : [];
   if(dom>=15) cur.forEach(c=>{ if(!rentPaid(c,m) && !(c.unpaid||[]).includes(m)) todo.push({k:"bad", chip:"Cobrament", t:`<b>${esc(c.tenantName||"Inquilí")}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Lloguer de ${monthName(m)} no anotat · ${eur(split(c).net)}</div>`, act:`<button class="btn sm primary" data-act="quickRent" data-id="${c.id}">Anotar cobrament</button>`}); });
   S.contracts.filter(c=>propById(c.propId) && cStatus(c)==="vigent" && c.end && daysBetween(td,c.end)<=60).forEach(c=>todo.push({k:"warn", chip:"Contracte", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Acaba el ${fmtDate(c.end)} (${daysBetween(td,c.end)} dies)</div>`, act:`<button class="btn sm" data-act="openContracts" data-id="${c.propId}">Veure</button>`}));
+  { const yy=today().slice(0,4), mo=+today().slice(5,7); let seen=""; try{ seen=localStorage.getItem("lloguers-fixed-review")||""; }catch{}
+    const reviewed=sortedProps().some(p=>p.fixedReviewed===yy) || seen===yy;
+    if(mo<=2 && !reviewed && S.props.length) todo.unshift({k:"warn", chip:"Any nou", t:`<b>Posa al dia les despeses que vindran el ${yy}</b><div class="small muted">IBI, comunitat, assegurança… així cada mes sabràs el que et quedarà de veritat</div>`, act:`<button class="btn sm primary" data-act="fixedReview">Revisar</button><button class="btn sm" data-act="fixedReviewed">Ja està</button>`}); }
   cur.forEach(c=>{ if(c.tenantType!=="empresa" && (+c.deposit||0)>0 && c.depositUnpaid) todo.push({k:"bad", chip:"Fiança", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">La fiança de ${eur(c.deposit)} no està pagada</div>`, act:`<button class="btn sm" data-act="depositForm" data-id="${c.id}">Canviar</button>`}); });
   cur.forEach(c=>{ if(c.tenantType!=="empresa" && (+c.deposit||0)>0 && !c.incasol && !c.depositUnpaid) todo.push({k:"warn", chip:"Fiança", t:`<b>${esc(c.tenantName)}</b> · ${esc(propById(c.propId).name)}<div class="small muted">Fiança de ${eur(c.deposit)} sense marcar com a dipositada a l'organisme oficial</div>`, act:`<button class="btn sm primary" data-act="depositOk" data-id="${c.id}">Ja està dipositada</button><button class="btn sm" data-act="editContract" data-id="${c.id}">Revisar</button>`}); });
   sortedProps().forEach(p=>{ const r=nextRenew(p.policyRenewal); if(r && daysBetween(td,r)<=30) todo.push({k:"warn", chip:"Assegurança", t:`<b>${esc(p.name)}</b><div class="small muted">La pòlissa${p.insurer?" de "+esc(p.insurer):""} venç el ${fmtDate(r)} (${daysBetween(td,r)} dies)</div>`, act:`<button class="btn sm primary" data-act="policyRenewed" data-id="${p.id}">Ja està renovada</button><button class="btn sm" data-act="openProp" data-id="${p.id}">Veure</button>`}); });
@@ -1698,6 +1706,9 @@ function openSheet(title, body, closeLabel="Tanca"){
 }
 function closeSheet(){ if(scanCtl){ try{scanCtl.abort();}catch{} scanCtl=null; } $("#sheet-root").innerHTML=""; }
 let toastT; function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>el.hidden=true,2800); }
+// Avís amb botó "Desfer" (per si t'has equivocat).
+function toastUndo(t, undo){ const el=$("#toast"); el.innerHTML=""; const sp=document.createElement("span"); sp.textContent=t; const b=document.createElement("button"); b.type="button"; b.className="tundo"; b.textContent="Desfer";
+  b.onclick=async()=>{ el.hidden=true; try{ await undo(); toast("Desfet"); }catch{ toast("No s'ha pogut desfer."); } }; el.append(sp,b); el.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>el.hidden=true,7000); }
 const field = (label, inner) => `<label class="field"><span>${label}</span>${inner}</label>`;
 const opts = (list, val) => list.map(o=>{ const [v,l]=Array.isArray(o)?o:[o,o]; return `<option value="${esc(v)}" ${v===val?"selected":""}>${esc(l)}</option>`; }).join("");
 const amtIn = (id,name,v,ph="") => `<input id="${id}" name="${name}" inputmode="decimal" autocomplete="off" value="${esc(amtStr(v))}" placeholder="${ph}">`;
@@ -2130,7 +2141,7 @@ function fixedPending(p, mo){
 function fixedPanel(p){
   const its=p.fixed||[], tot=its.reduce((a,it)=>a+fixedYear(it),0);
   return `<section class="panel"><div class="panel-h"><div><h3>Despeses fixes de l'any</h3><p class="small muted" style="margin:2px 0 0">Les que ja saps que arribaran. Cada mes es resten del que et queda, fins que n'escanegis el rebut real.</p></div></div>
-    ${its.length?`<ul class="slist fixl">${its.map((it,i)=>`<li class="srow click" data-act="fixedEdit" data-id="${p.id}|${i}"><div class="t"><b>${esc(it.concept||it.category)}</b><div class="small muted">${FREQS[it.freq]||""}${it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><span class="num">${eur(it.amount)}</span></li>`).join("")}</ul>
+    ${its.length?`<ul class="fixl">${its.map((it,i)=>`<li><div class="t"><b>${esc(it.concept||it.category)}</b><div class="small muted">${FREQS[it.freq]||""}${it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><span class="num">${eur(it.amount)}</span><button type="button" class="ib" data-act="fixedEdit" data-id="${p.id}|${i}" title="Corregir" aria-label="Corregir ${esc(it.concept||it.category)}">${PENCIL}</button><button type="button" class="ib del" data-act="fixedDel" data-id="${p.id}|${i}" title="Treure" aria-label="Treure ${esc(it.concept||it.category)}">×</button></li>`).join("")}</ul>
       <div class="fixtot"><span>Total a l'any</span><b class="num">${eur(tot)}</b><span class="small muted">${eur(tot/12)}/mes de mitjana</span></div>`
       :`<p class="small muted">Encara no n'hi ha cap. Pots afegir-les una a una o fer que les tregui dels moviments de l'any passat.</p>`}
     <div class="cact"><button class="btn sm primary" data-act="fixedEdit" data-id="${p.id}|new">Afegir</button><button class="btn sm" data-act="fixedSuggest" data-id="${p.id}">Treure-les de l'any passat</button></div></section>`;
@@ -2147,7 +2158,7 @@ function fixedForm(key){
   if($("#fx-del")) $("#fx-del").onclick=async()=>{ its.splice(+idx,1); if(await save(()=>db.doc("props/"+pid).update({fixed:its}),"Esborrada")) closeSheet(); };
   f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f); const n={concept:fd.get("concept").trim(), category:fd.get("category"), amount:parseAmt(fd.get("amount")), freq:fd.get("freq"), month:+fd.get("month")||1};
     if(!n.amount){ toast("Escriu l'import."); return; } if(idx==="new") its.push(n); else its[+idx]=n;
-    await save(()=>db.doc("props/"+pid).update({fixed:its}),"Desada"); };
+    await save(()=>db.doc("props/"+pid).update({fixed:its, fixedReviewed:today().slice(0,4)}),"Desada"); };
 }
 function fixedSuggest(pid){
   const p=propById(pid); if(!p) return; const to=curMonth(), from=addMonths(to,-12);
@@ -2159,34 +2170,35 @@ function fixedSuggest(pid){
     const x=list[list.length-1]; return {concept: x.category==="Comunitat"?"Comunitat":x.category==="IBI i taxes"?(x.concept||"IBI"):(x.provider||x.concept||x.category), category:x.category, amount:Math.round(total/times*100)/100, freq, month:months[0]||1}; })
     .filter(it=>!have.has(it.category+"|"+norm(it.concept)));
   if(!sug.length){ toast("No he trobat despeses repetides a l'últim any per a aquest pis."); return; }
-  openSheet("Despeses de l'any passat", `<form class="form" id="f-fsug"><p class="small muted" style="margin:0">He trobat aquestes despeses als últims 12 mesos. Marca les que es repetiran i corregeix l'import si cal.</p>
+  openSheet("Despeses de l'any passat", `<form class="form" id="f-fsug"><p style="margin:0"><b>Marca les despeses que es repetiran.</b></p><p class="small muted" style="margin:0">Si l'import no és bo, toca'l i canvia'l.</p>
     <ul class="slist">${sug.map((it,i)=>`<li class="sugrow"><label class="chk"><input type="checkbox" name="on" value="${i}" checked></label><div class="t"><b>${esc(it.concept)}</b><div class="small muted">${esc(it.category)} · ${FREQS[it.freq]}${it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><input class="amt sugamt" data-i="${i}" inputmode="decimal" value="${amtStr(it.amount)}" aria-label="Import de ${esc(it.concept)}"></li>`).join("")}</ul>
     <div class="actions"><button class="btn primary">Afegir les marcades</button></div></form>`);
   $("#f-fsug").onsubmit=async e=>{ e.preventDefault(); const on=new FormData(e.target).getAll("on").map(Number);
     const add=on.map(i=>({...sug[i], amount:parseAmt($(`.sugamt[data-i="${i}"]`).value)||sug[i].amount}));
     if(!add.length){ toast("No n'has marcat cap."); return; }
-    await save(()=>db.doc("props/"+pid).update({fixed:[...(p.fixed||[]), ...add]}), `${add.length} despes${add.length>1?"es afegides":"a afegida"}`); };
+    const before=[...(p.fixed||[])];
+    if(await save(()=>db.doc("props/"+pid).update({fixed:[...before, ...add]}))) toastUndo(`${add.length} despes${add.length>1?"es afegides":"a afegida"}`, ()=>db.doc("props/"+pid).update({fixed:before})); };
 }
 
 function quickRent(id){
   const c=conById(id); if(!c) return; const m=curMonth(), r=split(c), extra=r.net-r.base;
   openSheet(`${esc(propById(c.propId)?.name||"")} · ${monthName(m)}`, `<form class="form" id="f-qr">
-    <div class="seg" role="tablist" aria-label="Què vols anotar"><label><input type="radio" name="qk" value="cob" checked>Cobrament</label><label><input type="radio" name="qk" value="imp">Imprevist</label></div>
+    <div class="seg" role="tablist" aria-label="Què vols anotar"><label><input type="radio" name="qk" value="cob" checked>Cobrament</label><label><input type="radio" name="qk" value="imp">Imprevistos</label></div>
     <p class="muted" style="margin:0">${esc(c.tenantName||"")} · lloguer de ${monthName(m)}</p>
     ${r.net!==r.base?`<div class="note">Renda ${eur(r.base)}${r.iva?` + IVA ${eur(r.iva)}`:""}${r.ret?` − retenció ${eur(r.ret)}`:""}${r.fee?` − comissió ${eur(r.fee)}`:""} = ${eur(r.net)} que hauries de rebre.</div>`:""}
     <div class="row2">${field("Import cobrat (€)", amtIn("qr-amt","amount",r.net))}${field("Data", `<input type="date" name="date" value="${today()}" required>`)}</div>
-    <label class="check"><input type="checkbox" id="qr-chg"> La renda ha canviat</label>
+    <button type="button" class="btn tgl" id="qr-chg" aria-pressed="false">La renda ha canviat</button>
     <div id="qr-new" hidden><div class="row2">${field("Renda nova (€/mes)", amtIn("qr-rent","newRent",""))}${field("Des de", `<input type="month" name="from" value="${m}">`)}</div>
       <p class="small muted" style="margin:0">Es guardarà al contracte i es farà servir a partir d'aquest mes.</p></div>
     <div class="actions"><button class="btn primary" id="qr-save">Desar</button></div></form>`);
   const f=$("#f-qr");
   f.addEventListener("change", e=>{
-    if(e.target.name==="qk" && e.target.value==="imp"){ closeSheet(); moveForm({type:"despesa", date:today(), propId:c.propId, contractId:c.id, category:"Reparació i manteniment"}, {only:"despesa", title:"Imprevist"}); return; }
-    if(e.target.id==="qr-chg"){ $("#qr-new").hidden=!e.target.checked; if(e.target.checked) $("#qr-rent").focus(); }
+    if(e.target.name==="qk" && e.target.value==="imp"){ closeSheet(); moveForm({type:"despesa", date:today(), propId:c.propId, contractId:c.id, category:"Reparació i manteniment"}, {only:"despesa", title:"Imprevistos"}); return; }
   });
+  $("#qr-chg").onclick=()=>{ const b=$("#qr-chg"), on=b.getAttribute("aria-pressed")!=="true"; b.setAttribute("aria-pressed", on); $("#qr-new").hidden=!on; if(on) $("#qr-rent").focus(); };
   $("#qr-rent").addEventListener("input", ()=>{ const v=parseAmt($("#qr-rent").value); if(v>0) $("#qr-amt").value=amtStr(Math.round((v+extra)*100)/100); });
   f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f), amount=parseAmt(fd.get("amount")); if(!amount){ toast("Escriu l'import."); return; }
-    const chg=$("#qr-chg").checked, nr=parseAmt(fd.get("newRent")), from=fd.get("from")||m;
+    const chg=$("#qr-chg").getAttribute("aria-pressed")==="true", nr=parseAmt(fd.get("newRent")), from=fd.get("from")||m;
     if(chg && !(nr>0)){ toast("Escriu la renda nova."); $("#qr-rent").focus(); return; }
     if(rentPaid(c,m) && !f.dataset.dupOk){ f.dataset.dupOk="1"; toast(`Ja hi ha un cobrament de ${monthName(m)}. Torna a prémer Desar si és correcte.`); return; }
     $("#qr-save").disabled=true;
@@ -3190,7 +3202,11 @@ const ACT = {
   newContract: id => contractForm({}, id), editContract: id => contractForm(conById(id)), delContract, endContract: id => endContractForm(id),
   editMortgage: id => mortgageForm(id),
   privToggle: () => { const on=!document.body.classList.contains("priv"); document.body.classList.toggle("priv", on); try{ localStorage.setItem("lloguers-priv", on?"1":""); }catch{} render(); },
+  fixedReview: () => { const p=sortedProps()[0]; if(!p) return; S.view="props"; S.propId=p.id; S.tab="resum"; closeSheet(); render(); go(); setTimeout(()=>{ const el=document.querySelector(".fixl, [data-act=fixedSuggest]"); el&&el.scrollIntoView({behavior:"smooth",block:"center"}); },150); },
+  fixedReviewed: () => { try{ localStorage.setItem("lloguers-fixed-review", today().slice(0,4)); }catch{} sortedProps().forEach(p=>db.doc("props/"+p.id).update({fixedReviewed:today().slice(0,4)}).catch(()=>{})); toast("Perfecte!"); render(); },
   fixedEdit: key => fixedForm(key), fixedSuggest: id => fixedSuggest(id),
+  fixedDel: async key => { const [pid, i]=String(key).split("|"), p=propById(pid); if(!p) return; const its=[...(p.fixed||[])], gone=its.splice(+i,1)[0]; if(!gone) return;
+    try{ await db.doc("props/"+pid).update({fixed:its}); toastUndo(`«${gone.concept||gone.category}» tret`, async()=>{ const q=propById(pid); const back=[...(q.fixed||[])]; back.splice(+i,0,gone); await db.doc("props/"+pid).update({fixed:back}); }); }catch{ toast("No s'ha pogut treure."); } },
   depositForm: id => { const c=conById(id); if(!c) return; const st=c.depositUnpaid?"no":c.incasol?"dip":"pag";
     openSheet("Fiança", `<form class="form" id="f-dep">${field("Import (€)", amtIn("dp-amt","deposit",c.deposit))}
       <div class="radios">${[["dip","Pagada i dipositada a l'organisme oficial"],["pag","Pagada, però falta dipositar-la"],["no","No l'ha pagada"]].map(([v,l])=>`<label class="check"><input type="radio" name="st" value="${v}" ${st===v?"checked":""}> ${l}</label>`).join("")}</div>
