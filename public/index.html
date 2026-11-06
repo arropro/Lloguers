@@ -1251,7 +1251,7 @@ function viewResum(){
         return `<div class="htop"><span class="eyebrow">${monthName(m)} ${m.slice(0,4)}</span>${todo.length?`<a class="hchip" href="#per-revisar" data-act="goTodo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>${todo.length} avís${todo.length===1?"":"os"}</a>`:`<span class="hchip ok">Tot en ordre</span>`}<button type="button" class="eyeb" data-act="privToggle" aria-pressed="${document.body.classList.contains("priv")}" title="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}" aria-label="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}">${document.body.classList.contains("priv")?EYE_OFF:EYE_ON}</button></div>
       <div class="bigl">Aquest mes et quedaran</div>
       <div class="big ${fl<0?"neg":""}">${eur(fl)}</div>
-      <div class="hsub">${fl<0?"Aquest mes gastaràs més del que cobraràs":"És el que et queda dels lloguers després de pagar totes les despeses i rebuts del mes i la hipoteca"}</div>`; })()}
+      ${fl<0?`<div class="hsub">Aquest mes gastaràs més del que cobraràs</div>`:""}`; })()}
     </div>
     ${(()=>{ const pc=expected?Math.min(100,Math.round(cobrat/expected*100)):0;
       const floors=sortedProps().filter(p=>current(p.id).length).map(p=>{ const cs=current(p.id), e=sum(cs,c=>split(c,m).net), g=sum(cs,c=>Math.min(sum(rentMoves(c,m)), split(c,m).net)); return {name:p.name, f:e?g/e:1, none:!e}; });
