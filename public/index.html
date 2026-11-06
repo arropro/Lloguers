@@ -1241,7 +1241,7 @@ function hipFor(props, y){
 }
 function moneyLine(list, hip, lead){
   const inc=sum(list.filter(x=>x.type==="ingres"&&x.category!=="Fiança")), out=sum(list.filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra"));
-  return `<div class="totals mline">${lead?`<span class="tlead">${lead}</span>`:""}<span class="${hip?"tinc":""}"><small>Ingressos</small><b class="num pos">${eur(inc)}</b></span><span><small>Despeses</small><b class="num neg">${eur(out)}</b></span>${hip?`<span><small>Hipoteca</small><b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill" title="No compta les fiances ni les despeses de compra (notari, impostos…), però sí la hipoteca"><span class="ni"><img src="/sac.png?v=2" alt=""></span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
+  return `<div class="totals mline">${lead?`<span class="tlead">${lead}</span>`:""}<span class="${hip?"tinc":""}"><small>Ingressos</small><b class="num pos">${eur(inc)}</b></span><span><small>Despeses</small><b class="num neg">${eur(out)}</b></span>${hip?`<span><small>Hipoteca</small><b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill" title="No compta les fiances ni les despeses de compra (notari, impostos…), però sí la hipoteca"><span class="ni"><img src="/sac.png?v=3" alt=""></span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
 }
 function yearLine(vm){
   const y=today().slice(0,4), ym=vm.filter(x=>String(x.date).startsWith(y));
