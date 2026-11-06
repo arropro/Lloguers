@@ -732,6 +732,7 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
 .plg{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:2px}
 .plg span{display:flex;align-items:center;gap:5px}.plg i{width:12px;height:3px;border-radius:2px;display:inline-block}
 .plg i.dsh{background:repeating-linear-gradient(90deg,var(--out) 0 4px,transparent 4px 7px)}
+.totals .brk{flex-basis:100%;height:0;margin-top:-14px}
 .netpill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:999px;
   background:linear-gradient(120deg,color-mix(in srgb,#F5B931 22%,transparent),color-mix(in srgb,var(--in) 22%,transparent));
   border:1px solid color-mix(in srgb,#F5B931 45%,transparent);box-shadow:0 8px 22px -14px #F5B931}
@@ -739,7 +740,8 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
 .netpill .nt{font-weight:600}
 .netpill b{font-weight:800;font-size:1.05em;background:linear-gradient(90deg,#F2A31B,var(--in));-webkit-background-clip:text;background-clip:text;color:transparent}
 /* targetes per pis */
-.ftiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+@media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
 .ftile{font:inherit;color:inherit;text-align:left;cursor:pointer;position:relative;display:grid;gap:2px;align-content:start;padding:12px 12px 8px;border-radius:20px;overflow:hidden;min-width:0;
   background:radial-gradient(120% 90% at 0% 0%, color-mix(in srgb,var(--c) 20%,transparent),transparent 62%),var(--surface);
   border:1px solid color-mix(in srgb,var(--c) 38%,var(--line));box-shadow:0 14px 30px -22px var(--c);transition:transform .18s ease, box-shadow .18s ease}
@@ -752,7 +754,7 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
 .ftv{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin-top:10px;white-space:nowrap}
 .ftt{font-size:.78rem;min-height:1.1em}
 .tup{color:var(--in);font-weight:700}.tdn{color:var(--out);font-weight:700}
-.spk{display:block;width:100%;height:auto;margin-top:4px;overflow:visible}
+.spk{display:block;width:100%;margin-top:4px;overflow:visible}
 .ftnote{font-size:.75rem;color:var(--muted);margin:12px 2px 0;line-height:1.4}
 .pspk{display:grid;gap:2px}
 .psh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
@@ -1069,7 +1071,7 @@ function renderRail(){
 // Els imports grans s'encongeixen si no hi caben (així no es tallen al mòbil).
 function fitNums(){
   requestAnimationFrame(()=>{
-    document.querySelectorAll("main .hero .big, main .hstats .num, main .ftile .ftv").forEach(el=>{
+    document.querySelectorAll("main .hero .big, main .hstats .num").forEach(el=>{
       el.style.fontSize=""; el.style.whiteSpace="nowrap"; el.style.display="inline-block"; el.style.maxWidth="none";
       const box=el.parentElement; if(!box) return;
       const cs=getComputedStyle(box), avail=box.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
@@ -1180,7 +1182,7 @@ function viewResum(){
     ${flatTiles()}
     ${yearLine(vm)}
   </section>
-  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b><small>Tria l'any i et preparo l'Excel amb totes les factures, en un sol fitxer</small></span></button></section>`;
+  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b></span></button></section>`;
 }
 const PENCIL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg>`;
 const CHEV=`<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
@@ -1190,7 +1192,7 @@ function yearLine(vm){
   const y=today().slice(0,4), ym=vm.filter(x=>String(x.date).startsWith(y));
   const inc=sum(ym.filter(x=>x.type==="ingres")), out=sum(ym.filter(x=>x.type==="despesa" && x.category!=="Despeses de compra")), inv=sum(ym.filter(x=>x.type==="despesa" && x.category==="Despeses de compra"));
   let hip=0; for(let mo=y+"-01"; mo<=curMonth(); mo=addMonths(mo,1)) hip+=mtgMonthAll(mo);
-  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span class="netpill"><span class="ni">💰</span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
+  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill"><span class="ni">💰</span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
 }
 
 function niceMax(v){ if(v<=0) return 100; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
@@ -1229,8 +1231,8 @@ function spark(a,c,id,W=160,H=46,b){
   const mx=Math.max(...a,...(b||[]))||1, P=arr=>arr.map((v,i)=>[4+i*(W-8)/(arr.length-1), H-5-(H-14)*v/mx]), pts=P(a);
   const curve=pts=>{ let d=`M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`; for(let i=1;i<pts.length;i++){ const cx=((pts[i-1][0]+pts[i][0])/2).toFixed(1); d+=` C${cx} ${pts[i-1][1].toFixed(1)} ${cx} ${pts[i][1].toFixed(1)} ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`; } return d; };
   const d=curve(pts), l=pts[pts.length-1];
-  let o=""; if(b&&b.some(v=>v>0)){ const q=P(b), e=q[q.length-1]; o=`<path d="${curve(q)}" fill="none" stroke="var(--out)" stroke-width="1.8" stroke-dasharray="4 3" stroke-linecap="round" opacity=".9"/><circle cx="${e[0].toFixed(1)}" cy="${e[1].toFixed(1)}" r="2.6" fill="var(--out)"/>`; }
-  return `<svg class="spk" viewBox="0 0 ${W} ${H}" aria-hidden="true">${o}<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".45"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${l[0].toFixed(1)} ${H} L${pts[0][0]} ${H}Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${c}" stroke-width="5" stroke-opacity=".22" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cx="${l[0].toFixed(1)}" cy="${l[1].toFixed(1)}" r="3.6" fill="var(--surface)" stroke="${c}" stroke-width="2.6"/></svg>`;
+  let o=""; if(b&&b.some(v=>v>0)){ const q=P(b), e=q[q.length-1]; o=`<path d="${curve(q)}" fill="none" stroke="var(--out)" stroke-width="1.8" stroke-dasharray="4 3" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".9"/><path d="M${e[0].toFixed(1)} ${e[1].toFixed(1)}h0" stroke="var(--out)" stroke-width="5.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
+  return `<svg class="spk" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px" aria-hidden="true">${o}<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".45"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${l[0].toFixed(1)} ${H} L${pts[0][0]} ${H}Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${c}" stroke-width="5" stroke-opacity=".22" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M${l[0].toFixed(1)} ${l[1].toFixed(1)}h0" stroke="${c}" stroke-width="10" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M${l[0].toFixed(1)} ${l[1].toFixed(1)}h0" stroke="var(--surface)" stroke-width="4.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
 }
 const trendTag = t => t===null ? "" : `<b class="${t>=0?"tup":"tdn"}" title="Últims 3 mesos comparats amb els 3 d'abans">${t>=0?"▲":"▼"} ${Math.abs(t)}%</b>`;
 
