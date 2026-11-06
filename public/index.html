@@ -763,6 +763,8 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
   .mline b{font-size:.98rem}
   .mline .netpill{grid-column:1/-1;border-radius:999px;padding:7px 14px 7px 8px}
 }
+@media (min-width:900px){.hero .htower{margin-right:clamp(40px,8vw,140px)}}
+canvas.fw{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1114,6 +1116,51 @@ function renderRail(){
 
 /* ================= render ================= */
 // Els imports grans s'encongeixen si no hi caben (així no es tallen al mòbil).
+/* ---------- Focs artificials quan s'ha cobrat tot ---------- */
+let FW_LAST=0;
+function fireworks(force){
+  const hero=document.querySelector("main .hero"), tw=hero&&hero.querySelector(".htower"); if(!tw) return;
+  try{ if(matchMedia("(prefers-reduced-motion: reduce)").matches) return; }catch(e){}
+  if(!force && Date.now()-FW_LAST<60000) return; FW_LAST=Date.now();
+  const old=hero.querySelector("canvas.fw"); if(old) old.remove();
+  const cv=document.createElement("canvas"); cv.className="fw"; hero.appendChild(cv);
+  const dpr=Math.min(2,window.devicePixelRatio||1), hr=hero.getBoundingClientRect(), W=hr.width, H=hr.height;
+  cv.width=W*dpr; cv.height=H*dpr; const ctx=cv.getContext("2d"); ctx.scale(dpr,dpr);
+  const sr=tw.querySelector("svg").getBoundingClientRect(), bx=sr.left-hr.left, by=sr.top-hr.top, bw=sr.width, bh=sr.height;
+  const COLS=["#FFD66B","#F5B931","#FF8A5B","#FF5C8A","#7EE0A8","#6FA8FF","#C59BFF","#FFF4D6"];
+  const pick=()=>COLS[Math.random()*COLS.length|0], rockets=[], parts=[], T0=performance.now(), DUR=5200;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function launch(){
+    const r=Math.random(); let tx,ty;
+    if(r<.4){ tx=bx+bw*(.1+Math.random()*.8); ty=by-bh*(.02+Math.random()*.22); }
+    else if(r<.7){ tx=bx-bw*(.25+Math.random()*.7); ty=by+bh*(Math.random()*.55); }
+    else { tx=bx+bw*(1.25+Math.random()*.7); ty=by+bh*(Math.random()*.55); }
+    tx=clamp(tx,16,W-16); ty=clamp(ty,16,H-30);
+    rockets.push({x:bx+bw*(Math.random()<.5?.12:.88), y:by+bh*.95, tx, ty, t:0, d:420+Math.random()*260, c:pick()});
+  }
+  function burst(r){
+    const n=36+(Math.random()*22|0), sp=1.5+Math.random()*1.5, c2=Math.random()<.45?pick():r.c;
+    for(let i=0;i<n;i++){ const a=i/n*Math.PI*2+Math.random()*.25, v=sp*(.55+Math.random()*.55);
+      parts.push({x:r.tx,y:r.ty,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:1,c:i%3?r.c:c2,s:1.3+Math.random()*1.4,tw:Math.random()<.3}); }
+  }
+  let next=0, last=T0;
+  function step(now){
+    const dt=Math.min(40,now-last)/16.7, el=now-T0; last=now;
+    if(el<DUR-1400 && el>=next){ launch(); if(Math.random()<.35) launch(); next=el+240+Math.random()*320; }
+    ctx.globalCompositeOperation="destination-out"; ctx.fillStyle="rgba(0,0,0,.26)"; ctx.fillRect(0,0,W,H);
+    ctx.globalCompositeOperation="lighter";
+    for(let i=rockets.length-1;i>=0;i--){ const r=rockets[i]; r.t+=16.7*dt; const k=Math.min(1,r.t/r.d), e=1-(1-k)*(1-k);
+      ctx.fillStyle=r.c; ctx.beginPath(); ctx.arc(r.x+(r.tx-r.x)*e, r.y+(r.ty-r.y)*e, 1.8, 0, 7); ctx.fill();
+      if(k>=1){ burst(r); rockets.splice(i,1); } }
+    for(let i=parts.length-1;i>=0;i--){ const p=parts[i];
+      p.vx*=Math.pow(.965,dt); p.vy=p.vy*Math.pow(.965,dt)+.03*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.l-=.011*dt;
+      if(p.l<=0){ parts.splice(i,1); continue; }
+      ctx.globalAlpha=Math.max(0,p.l)*(p.tw&&Math.random()<.4?.3:1); ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,p.s*(.45+p.l*.55),0,7); ctx.fill(); }
+    ctx.globalAlpha=1;
+    if(el<DUR||parts.length||rockets.length) requestAnimationFrame(step); else cv.remove();
+  }
+  requestAnimationFrame(step);
+}
 function fitNums(){
   requestAnimationFrame(()=>{
     document.querySelectorAll("main .hero .big, main .hstats .num").forEach(el=>{
@@ -1140,6 +1187,7 @@ function render(){
   else html += viewMoves();
   main.innerHTML = html;
   fitNums();
+  { const ft=document.querySelector("main .htower.full"); if(ft){ ft.style.cursor="pointer"; ft.addEventListener("click",()=>fireworks(true)); setTimeout(()=>fireworks(false),900); } }
   const sb=$("#nav .scan"); if(sb){ let b=sb.querySelector(".nb"); const n=S.inbox.length; if(n){ if(!b){ b=document.createElement("span"); b.className="nb"; sb.appendChild(b); } b.textContent=n; } else if(b) b.remove(); }
   scanCount();
   renderRail();
@@ -1207,7 +1255,7 @@ function viewResum(){
     </div>
     ${(()=>{ const pc=expected?Math.min(100,Math.round(cobrat/expected*100)):0;
       const floors=sortedProps().filter(p=>current(p.id).length).map(p=>{ const cs=current(p.id), e=sum(cs,c=>split(c,m).net), g=sum(cs,c=>Math.min(sum(rentMoves(c,m)), split(c,m).net)); return {name:p.name, f:e?g/e:1, none:!e}; });
-      return `<div class="htower" role="img" aria-label="${pc}% dels lloguers del mes cobrats">${tower(floors,pc)}<div class="tt"><b>${pc}<span>%</span></b><small>cobrat del mes</small></div></div>`; })()}
+      return `<div class="htower ${pc>=100?"full":""}" role="img" aria-label="${pc}% dels lloguers del mes cobrats">${tower(floors,pc)}<div class="tt"><b>${pc}<span>%</span></b><small>${pc>=100?"tot cobrat! 🎉":"cobrat del mes"}</small></div></div>`; })()}
     <div class="hstats">
       <div><span class="label">Lloguers del mes</span><span class="num">${eur(expected)}</span><small>${cur.length} contracte${cur.length===1?"":"s"}${cur.some(c=>+c.feePct>0)?" · nets de comissió":""}</small></div>
       <div><span class="label">Lloguers cobrats</span><span class="num">${eur(cobrat)}</span><span class="hbar"><i style="width:${expected?Math.min(100,Math.round(cobrat/expected*100)):0}%"></i></span></div>
