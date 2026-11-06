@@ -738,6 +738,7 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
   background:linear-gradient(120deg,color-mix(in srgb,#F5B931 22%,transparent),color-mix(in srgb,var(--in) 22%,transparent));
   border:1px solid color-mix(in srgb,#F5B931 45%,transparent);box-shadow:0 8px 22px -14px #F5B931}
 .netpill .ni{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#2A3F8F,#0B1430 75%);box-shadow:0 0 0 2px #F5B931,0 4px 14px -4px #F5B931;font-size:24px;line-height:1}
+.netpill .ni img{width:70%;height:70%;object-fit:contain;display:block;filter:drop-shadow(0 1px 2px rgb(0 0 0 / .35))}
 .netpill .nt{font-weight:600}
 .netpill b{font-weight:800;font-size:1.05em;background:linear-gradient(90deg,#F2A31B,var(--in));-webkit-background-clip:text;background-clip:text;color:transparent}
 .mline{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:stretch;margin-top:16px}
@@ -1240,7 +1241,7 @@ function hipFor(props, y){
 }
 function moneyLine(list, hip, lead){
   const inc=sum(list.filter(x=>x.type==="ingres"&&x.category!=="Fiança")), out=sum(list.filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra"));
-  return `<div class="totals mline">${lead?`<span class="tlead">${lead}</span>`:""}<span class="${hip?"tinc":""}"><small>Ingressos</small><b class="num pos">${eur(inc)}</b></span><span><small>Despeses</small><b class="num neg">${eur(out)}</b></span>${hip?`<span><small>Hipoteca</small><b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill" title="No compta les fiances ni les despeses de compra (notari, impostos…), però sí la hipoteca"><span class="ni">💰</span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
+  return `<div class="totals mline">${lead?`<span class="tlead">${lead}</span>`:""}<span class="${hip?"tinc":""}"><small>Ingressos</small><b class="num pos">${eur(inc)}</b></span><span><small>Despeses</small><b class="num neg">${eur(out)}</b></span>${hip?`<span><small>Hipoteca</small><b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill" title="No compta les fiances ni les despeses de compra (notari, impostos…), però sí la hipoteca"><span class="ni"><img src="/sac.png?v=1" alt=""></span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
 }
 function yearLine(vm){
   const y=today().slice(0,4), ym=vm.filter(x=>String(x.date).startsWith(y));
