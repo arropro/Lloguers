@@ -1326,7 +1326,7 @@ const shortProp = n => String(n||"").replace(/^pis\s+/i,"").replace(/\s*\(.*?\)\
 function flatSeries(p){
   const end=addMonths(curMonth(),-1), months=[]; for(let i=11;i>=0;i--) months.push(addMonths(end,-i));
   const ms=movesOf(p.id).filter(x=>x.type==="ingres"&&x.category!=="Fiança");
-  const a=months.map(m=>sum(ms.filter(x=>ymOf(x.date)===m)));
+  const a=months.map(m=>sum(ms.filter(x=>movePeriod(x)===m)));   // per mes al qual correspon el lloguer, no pel dia que es cobra
   const l3=a[9]+a[10]+a[11], p3=a[6]+a[7]+a[8], M=mtg(p);
   const ds=movesOf(p.id).filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra");
   const b=months.map(m=>sum(ds.filter(x=>ymOf(x.date)===m))+(M?mtgPay(M,m):0));
