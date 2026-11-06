@@ -206,7 +206,7 @@ button{margin-top:12px;width:100%;padding:14px;border:0;border-radius:14px;backg
 <input type="password" name="password" autocomplete="current-password" placeholder="Contrasenya" required autofocus><button>Entrar</button><div class="e">${msg}</div></form></body></html>`;
 const html = (s, status = 200) => new Response(s, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 
-const PUBLIC_PATHS = new Set(["/sw.js"]);
+const PUBLIC_PATHS = new Set(["/sw.js", "/badge.png", "/icons/edifici-192.png"]);
 
 // ---------- icona de l'app (es pot canviar des de "Còpia de seguretat") ----------
 const ICONS = ["skyline", "empire-dia", "empire-capvespre", "edifici"];

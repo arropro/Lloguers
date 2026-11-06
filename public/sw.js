@@ -1,5 +1,5 @@
 // Service worker mínim: permet instal·lar l'app. Les dades, els documents i la icona sempre vénen del servidor.
-const CACHE = "lloguers-v6";
+const CACHE = "lloguers-v7";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });
 const SKIP = /^\/(api|_blob|icons)\/|^\/(icon-192\.png|icon-512\.png|apple-touch-icon\.png|favicon\.ico|manifest\.webmanifest|splash\.jpg|splash-wide\.jpg)$/;
@@ -15,7 +15,7 @@ self.addEventListener("push", (e) => {
   e.waitUntil((async () => {
     let m = { title: "Els meus lloguers", body: "Tens lloguers pendents d'anotar. Obre l'app." };
     try { const r = await fetch("/api/push/message", { credentials: "same-origin", cache: "no-store" }); if (r.ok) m = await r.json(); } catch {}
-    await self.registration.showNotification(m.title, { body: m.body, icon: "/icon-192.png", badge: "/icon-192.png", tag: "lloguers", renotify: true, data: { url: "/" } });
+    await self.registration.showNotification(m.title, { body: m.body, icon: "/icons/edifici-192.png", badge: "/badge.png", tag: "lloguers", renotify: true, data: { url: "/" } });
   })());
 });
 self.addEventListener("notificationclick", (e) => {
