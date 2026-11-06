@@ -768,6 +768,10 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
 canvas.fw{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
 .fpay{font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;border:0;border-radius:999px;padding:4px 11px;background:var(--accent);color:#fff;box-shadow:0 4px 12px -6px var(--accent)}
 .fpay:hover{filter:brightness(1.1)}
+.gbtn .gic.chk{background:var(--accent);color:#fff}
+.chkok{display:flex;gap:14px;align-items:flex-start;padding:6px 2px}
+.chkok > span{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--in) 18%,transparent);color:var(--in);font-weight:800;font-size:22px}
+.chkok p{margin:4px 0 0}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1279,7 +1283,7 @@ function viewResum(){
     ${flatTiles()}
     ${yearLine(vm)}
   </section>
-  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b></span></button></section>`;
+  <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b></span></button><button type="button" class="gbtn" data-act="checkData"><span class="gic chk" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg></span><span class="gtx"><b>Comprovar les dades</b></span>${(()=>{const n=dataIssues().length; return n?`<span class="chip warn" style="margin-left:auto">${n}</span>`:`<span class="chip ok" style="margin-left:auto">✓</span>`;})()}</button></section>`;
 }
 const PENCIL=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4z"/><path d="M14.5 5.5l3 3"/></svg>`;
 const CHEV=`<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
@@ -1732,6 +1736,49 @@ function payHistory(cid){
   const c=conById(cid); if(!c) return; const all=contractMonths(c, curMonth()).reverse();
   openSheet(`Cobraments · ${esc(propById(c.propId)?.name||"")}`, `<ul class="slist">${all.map(mo=>{ const s=payState(c,mo), got=sum(rentMoves(c,mo));
     return `<li class="srow click" data-act="payMonth" data-id="${c.id}|${mo}"><div class="t"><b>${monthLabel(mo)}</b></div><span class="num small">${got?eur(got):eur(split(c,mo).net)}</span><span class="small ${s==="paid"?"pos":s==="unpaid"?"neg":"muted"}">${{paid:"Cobrat",unpaid:"No cobrat",due:"Pendent",unknown:"Sense anotar"}[s]}</span></li>`; }).join("")}</ul>`, "Tanca");
+}
+/* ================= Comprovar les dades ================= */
+// Busca incoherències a les dades i proposa com arreglar-les des de la mateixa app.
+function dataIssues(){
+  const out=[], vm=VM(), td=today(), pn=id=>esc((propById(id)||{}).name||"Sense pis");
+  const line=x=>`${fmtDate(x.date)} · <span class="num">${eur(x.amount)}</span>${x.concept?" · "+esc(x.concept):""}`;
+  // 1. Repetits: mateix pis, tipus, categoria, data i import
+  const seen=new Map();
+  [...vm].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)).forEach(x=>{ if(x.notDup) return; const k=[x.propId,x.type,x.category,x.date,x.amount].join("|");
+    if(seen.has(k)) out.push({k:"bad", chip:"Repetit", t:`<b>${pn(x.propId)}</b><div class="small muted">Hi ha dos moviments iguals: ${line(x)}</div>`,
+      act:`<button class="btn sm" data-act="delMove" data-id="${x.id}" data-confirm="Confirma: esborrar">Esborrar el repetit</button><button class="btn sm" data-act="chkNotDup" data-id="${x.id}">No és repetit</button>`});
+    else seen.set(k,x.id); });
+  // 2. Lloguers sense mes o sense contracte
+  const rents=vm.filter(x=>x.type==="ingres"&&x.category==="Lloguer"&&x.propId);
+  rents.filter(x=>!x.period).forEach(x=>out.push({k:"warn", chip:"Lloguer", t:`<b>${pn(x.propId)}</b><div class="small muted">No sé de quin mes és aquest lloguer: ${line(x)}</div>`, act:`<button class="btn sm primary" data-act="chkPeriod" data-id="${x.id}">És de ${monthName(ymOf(x.date))}</button><button class="btn sm" data-act="editMove" data-id="${x.id}">Canviar</button>`}));
+  rents.filter(x=>!x.contractId||!conById(x.contractId)).forEach(x=>{ const mo=movePeriod(x), c=S.contracts.find(c=>c.propId===x.propId&&(!c.start||ymOf(c.start)<=mo)&&(!c.end||ymOf(c.end)>=mo));
+    if(c) out.push({k:"warn", chip:"Lloguer", t:`<b>${pn(x.propId)}</b><div class="small muted">Aquest cobrament no està lligat a cap contracte: ${line(x)}</div>`, act:`<button class="btn sm primary" data-act="chkLink" data-id="${x.id}|${c.id}">És de ${esc(c.tenantName||"l'inquilí")}</button>`}); });
+  // 3. Mesos on s'ha cobrat bastant més que la renda (potser hi ha la fiança a dins)
+  S.contracts.filter(c=>propById(c.propId)).forEach(c=>{ for(let i=24;i>=1;i--){ const mo=addMonths(curMonth(),-i), ms=rentMoves(c,mo); if(!ms.length||ms.every(x=>x.okExtra)) continue;
+    const got=sum(ms), exp=split(c,mo).net; if(exp>0 && got>exp*1.15+5){ const big=[...ms].sort((a,b)=>b.amount-a.amount)[0];
+      out.push({k:"warn", chip:"Import alt", t:`<b>${pn(c.propId)}</b> · ${esc(c.tenantName||"")}<div class="small muted">${monthLabel(mo)}: cobrat ${eur(got)} i la renda és ${eur(exp)} (${eur(got-exp)} de més)</div>`,
+        act:`<button class="btn sm primary" data-act="chkFian" data-id="${big.id}|${Math.round((got-exp)*100)/100}">Hi ha la fiança a dins</button><button class="btn sm" data-act="chkOk" data-id="${ms.map(x=>x.id).join(",")}">És correcte</button>`}); } } });
+  // 4. Imports o dates estranyes
+  vm.filter(x=>!(+x.amount>0)||!isDate(x.date)).forEach(x=>out.push({k:"bad", chip:"Import", t:`<b>${pn(x.propId)}</b><div class="small muted">Moviment sense import o sense data: ${esc(x.concept||x.category||"")}</div>`, act:`<button class="btn sm" data-act="editMove" data-id="${x.id}">Arreglar</button>`}));
+  vm.filter(x=>isDate(x.date)&&x.date>dShift(31)).forEach(x=>out.push({k:"warn", chip:"Data", t:`<b>${pn(x.propId)}</b><div class="small muted">Té una data molt endavant: ${line(x)}</div>`, act:`<button class="btn sm" data-act="editMove" data-id="${x.id}">Revisar</button>`}));
+  // 5. Moviments sense pis i hipoteques que no quadren
+  const loose=vm.filter(x=>!x.propId).length; if(loose) out.push({k:"warn", chip:"Sense pis", t:`<b>${loose} moviment${loose>1?"s":""} sense pis</b><div class="small muted">No compten a cap pis fins que no els assignis</div>`, act:`<button class="btn sm" data-act="looseMoves">Assignar</button>`});
+  sortedProps().forEach(p=>{ const M=mtg(p); if(M&&!M.ok) out.push({k:"warn", chip:"Hipoteca", t:`<b>${esc(p.name)}</b><div class="small muted">Les dades de la hipoteca no quadren</div>`, act:`<button class="btn sm" data-act="editMortgage" data-id="${p.id}">Revisar</button>`}); });
+  return out;
+}
+function checkData(){
+  const iss=dataIssues();
+  openSheet("Comprovar les dades", iss.length
+    ? `<p class="muted">He trobat ${iss.length} ${iss.length>1?"coses":"cosa"} per revisar. Cada una té el botó per arreglar-la aquí mateix.</p><ul class="todo">${iss.map(todoLi).join("")}</ul>`
+    : `<div class="chkok"><span>✓</span><div><b>Tot quadra</b><p class="muted">He revisat els cobraments, les despeses, els contractes i les hipoteques i no he trobat res estrany.</p></div></div>`);
+}
+const chkAgain = () => { if(document.querySelector("#sheet")) checkData(); };
+async function chkFianGo(mid){
+  const x=S.moves.find(m=>m.id===mid); if(!x) return; const v=Math.round(parseFloat(String($("#chk-f").value).replace(",","."))*100)/100;
+  if(!(v>0) || v>=x.amount){ toast("Posa un import més petit que el cobrament"); return; }
+  try{ await db.doc("moves/"+mid).update({amount:Math.round((x.amount-v)*100)/100, okExtra:true});
+    await db.collection("moves").add({type:"ingres", date:x.date, amount:v, propId:x.propId, contractId:x.contractId||"", category:"Fiança", period:x.period||ymOf(x.date), concept:"Fiança"+(x.provider?" · "+x.provider:""), provider:x.provider||"", vat:0, source:"manual", createdAt:Date.now()});
+    toast("Fiança separada"); checkData(); }catch{ toast("No s'ha pogut desar."); }
 }
 function payMonthForm(key){
   const [cid, mo]=String(key).split("|"); const c=conById(cid); if(!c) return;
@@ -3406,7 +3453,15 @@ const ACT = {
       <div class="actions"><button class="btn primary">Desar</button></div></form>`);
     $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
       await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
-  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); }catch{ toast("No s'ha pogut desar."); } },
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
+  chkNotDup: async id => { try{ await db.doc("moves/"+id).update({notDup:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+  chkPeriod: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; try{ await db.doc("moves/"+id).update({period:ymOf(x.date)}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+  chkLink: async key => { const [id,cid]=key.split("|"); try{ await db.doc("moves/"+id).update({contractId:cid}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+  chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"+id).update({okExtra:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+  chkFian: key => { const [id,v]=key.split("|"); const x=S.moves.find(m=>m.id===id); if(!x) return; const c=conById(x.contractId); const sug=+v, dep=(c&&+c.deposit>0)?+c.deposit:0;
+    openSheet("Separar la fiança", `<div class="form"><p class="muted">${fmtDate(x.date)} · cobrament de ${eur(x.amount)}. Quina part era la fiança?</p><label class="field"><span>Import de la fiança</span><input id="chk-f" type="text" inputmode="decimal" value="${String(sug).replace(".",",")}"></label><p class="small muted">${dep?`Al contracte hi consta una fiança de ${eur(dep)}. `:""}Es restarà del lloguer i quedarà anotada com a fiança, que no compta com a ingrés.</p><div class="actions"><button type="button" class="btn ghost" data-act="checkData">Enrere</button><button type="button" class="btn primary" data-act="chkFianGo" data-id="${id}">Separar</button></div></div>`); },
+  chkFianGo: id => chkFianGo(id),
+  quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); }catch{ toast("No s'ha pogut desar."); } },
   allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
   markUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:[...new Set([...(c.unpaid||[]), mo])]}); closeSheet(); toast(`${monthLabel(mo)} marcat com a no cobrat`); }catch{ toast("No s'ha pogut desar."); } },
