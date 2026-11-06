@@ -50,6 +50,7 @@ async function ensureSchema(env) {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS blobs (id TEXT PRIMARY KEY, type TEXT NOT NULL, size INTEGER NOT NULL, created INTEGER NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS login_fail (ip TEXT NOT NULL, ts INTEGER NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS settings (k TEXT PRIMARY KEY, v TEXT NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, created INTEGER NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS ai_usage (month TEXT PRIMARY KEY, calls INTEGER NOT NULL, input INTEGER NOT NULL, output INTEGER NOT NULL)"),
   ]);
   schemaReady = true;
@@ -131,6 +132,67 @@ async function askClaude(env, request) {
       .bind(month, (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), u.output_tokens || 0).run();
   } catch { /* el comptador no és imprescindible */ }
   return json({ text, truncated: data.stop_reason === "max_tokens" });
+}
+
+
+// ---------- avisos al mòbil (Web Push) ----------
+// Les claus VAPID es creen soles el primer cop i es guarden a la base de dades (no cal cap secret).
+// Les notificacions s'envien sense contingut; el mòbil demana el text a /api/push/message (amb la sessió).
+async function vapidKeys(env){
+  const r = await env.DB.prepare("SELECT v FROM settings WHERE k = 'vapid'").first();
+  if (r) return JSON.parse(r.v);
+  const kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const priv = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  const pub = new Uint8Array(await crypto.subtle.exportKey("raw", kp.publicKey));
+  const keys = { priv, pub: b64url(pub) };
+  await env.DB.prepare("INSERT OR IGNORE INTO settings (k, v) VALUES ('vapid', ?)").bind(JSON.stringify(keys)).run();
+  const again = await env.DB.prepare("SELECT v FROM settings WHERE k = 'vapid'").first();
+  return JSON.parse(again.v);
+}
+async function sendPush(env, endpoint){
+  const keys = await vapidKeys(env), u = new URL(endpoint);
+  const head = b64url(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const body = b64url(enc.encode(JSON.stringify({ aud: u.origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: "mailto:avisos@lloguers.app" })));
+  const key = await crypto.subtle.importKey("jwk", keys.priv, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(head + "." + body)));
+  const res = await fetch(endpoint, { method: "POST", headers: { TTL: "86400", Urgency: "normal", Authorization: `vapid t=${head}.${body}.${b64url(sig)}, k=${keys.pub}` } });
+  if (res.status === 404 || res.status === 410) await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(endpoint).run();
+  return res.status;
+}
+const madrid = (d = new Date()) => { const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value])); return { date: `${p.year}-${p.month}-${p.day}`, ym: `${p.year}-${p.month}`, day: +p.day, hour: +p.hour % 24 }; };
+const MESOS = ["gener","febrer","març","abril","maig","juny","juliol","agost","setembre","octubre","novembre","desembre"];
+const eurCa = n => (Math.round(n * 100) / 100).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+// Lloguers del mes que encara no s'han anotat com a cobrats.
+async function pendingRents(env){
+  const t = madrid(), mo = t.ym, td = t.date;
+  const props = (await listCol(env, "props")), pmap = Object.fromEntries(props.map(p => [p.id, p.data]));
+  const cons = (await listCol(env, "contracts")).filter(c => pmap[c.data.propId]);
+  const moves = (await listCol(env, "moves")).map(m => m.data).filter(m => m.type === "ingres" && m.category === "Lloguer" && (m.period || String(m.date || "").slice(0, 7)) === mo);
+  const out = [];
+  for (const { id, data: c } of cons) {
+    if (c.start && c.start > td) continue;
+    if (c.end && (c.end < td || (c.ended && c.end <= td))) continue;
+    if ((c.unpaid || []).includes(mo)) continue;
+    if (moves.some(m => m.contractId ? m.contractId === id : m.propId === c.propId)) continue;
+    let rent = +c.rent || 0; (c.rents || []).filter(x => x && x.from && x.from <= mo).sort((a, b) => a.from.localeCompare(b.from)).forEach(x => { if (+x.amount > 0) rent = +x.amount; });
+    const extra = (c.extras || []).filter(x => x && x.freq === "mensual").reduce((a, x) => a + (+x.amount || 0), 0);
+    out.push({ name: pmap[c.propId].name || "Pis", amount: c.priceMode === "total" ? 0 : rent + extra });
+  }
+  return { mo, items: out };
+}
+async function reminderText(env){
+  const { mo, items } = await pendingRents(env), mes = MESOS[+mo.slice(5, 7) - 1];
+  if (!items.length) return null;
+  const list = items.map(i => i.amount ? `${i.name} (${eurCa(i.amount)})` : i.name).join(", ");
+  return { title: `Lloguers de ${mes}`, body: `Pendents d'anotar: ${list}. Si ja els has cobrat, toca ✓ a l'app.` };
+}
+async function dailyReminder(env){
+  const t = madrid();
+  if (t.hour !== 10 || t.day < 5 || t.day > 10) return;          // del dia 5 al 10, a les 10:30 (hora de Madrid)
+  const msg = await reminderText(env); if (!msg) return;
+  await env.DB.prepare("INSERT INTO settings (k, v) VALUES ('push_msg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(msg)).run();
+  const { results } = await env.DB.prepare("SELECT endpoint FROM push_subs").all();
+  for (const r of results) { try { await sendPush(env, r.endpoint); } catch {} }
 }
 
 // ---------- pàgina d'entrada ----------
@@ -248,11 +310,36 @@ async function api(request, env, url) {
     await env.DB.prepare("INSERT INTO settings (k, v) VALUES ('icon', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(body.icon).run();
     return json({ icon: body.icon });
   }
+  if (p === "/api/push/key" && m === "GET") return json({ key: (await vapidKeys(env)).pub });
+  if (p === "/api/push/subscribe" && m === "POST") {
+    const body = await request.json().catch(() => null);
+    const ep = body && body.endpoint; if (!ep || !/^https:\/\//.test(ep)) return err("invalid_request", 400);
+    await env.DB.prepare("INSERT OR IGNORE INTO push_subs (endpoint, created) VALUES (?, ?)").bind(ep, Date.now()).run();
+    return json({ ok: true });
+  }
+  if (p === "/api/push/unsubscribe" && m === "POST") {
+    const body = await request.json().catch(() => null); if (body && body.endpoint) await env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(body.endpoint).run();
+    return json({ ok: true });
+  }
+  if (p === "/api/push/test" && m === "POST") {
+    const msg = (await reminderText(env)) || { title: "Avisos activats", body: "Així t'arribaran els recordatoris dels lloguers, del dia 5 al 10 de cada mes a les 10:30." };
+    await env.DB.prepare("INSERT INTO settings (k, v) VALUES ('push_msg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(msg)).run();
+    const { results } = await env.DB.prepare("SELECT endpoint FROM push_subs").all(); let ok = 0;
+    for (const r of results) { try { const st = await sendPush(env, r.endpoint); if (st < 300) ok++; } catch {} }
+    return json({ sent: ok, total: results.length });
+  }
+  if (p === "/api/push/message" && m === "GET") {
+    const r = await env.DB.prepare("SELECT v FROM settings WHERE k = 'push_msg'").first();
+    return json(r ? JSON.parse(r.v) : { title: "Els meus lloguers", body: "Obre l'app per veure els avisos." });
+  }
   if (p === "/api/logout" && m === "POST") return json({ ok: true }, 200, { "set-cookie": cookie("", 0) });
   return err("not_found", 404);
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async () => { await ensureSchema(env); await dailyReminder(env); })());
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;

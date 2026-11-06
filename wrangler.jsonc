@@ -11,6 +11,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "lloguers" }
   ],
+  // Cada dia a les 8:30 i 9:30 UTC; el codi només envia l'avís quan a Madrid són les 10:30, del dia 5 al 10.
+  "triggers": { "crons": ["30 8 * * *", "30 9 * * *"] },
   "kv_namespaces": [
     { "binding": "BLOBS" }
   ]
