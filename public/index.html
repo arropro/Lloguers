@@ -765,6 +765,8 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
 }
 @media (min-width:900px){.hero .htower{margin-right:clamp(40px,8vw,140px)}}
 canvas.fw{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.fpay{font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;border:0;border-radius:999px;padding:4px 11px;background:var(--accent);color:#fff;box-shadow:0 4px 12px -6px var(--accent)}
+.fpay:hover{filter:brightness(1.1)}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1210,9 +1212,11 @@ function viewResum(){
     const ex=sum(mm.filter(x=>x.propId===p.id && x.type==="despesa"));
     const st = !cs.length ? `<span class="chip">Sense contracte</span>` : cs.every(c=>rentPaid(c,m)) ? `<span class="chip ok">Cobrat</span>` : `<span class="chip ${dom>=10?"bad":"warn"}">Pendent</span>`;
     const stc = !cs.length ? "" : cs.every(c=>rentPaid(c,m)) ? "ok" : dom>=10?"bad":"warn";
-    return `<button type="button" class="fcard" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)}${isEmp(p)?` <span class="chip emp">Empresa</span>`:""}</span>
+    const pend=cs.filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m));
+    const okb = pend.length ? `<button type="button" class="fpay" data-act="quickPaidProp" data-id="${p.id}" aria-label="Marcar ${esc(p.name)} com a cobrat">✓ Marcar cobrat</button>` : "";
+    return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)}${isEmp(p)?` <span class="chip emp">Empresa</span>`:""}</span>
       <span class="famt num">${cs.length?eur(prev):"—"}</span>
-      <span class="fmeta">${st}${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span></span></button>`;
+      <span class="fmeta">${st}${okb}${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span></span></div>`;
   }).join("");
   const loose = mm.filter(x=>!x.propId);
 
@@ -1243,8 +1247,7 @@ function viewResum(){
 
   const askPanel = askRent.length && dom<15 ? `<section class="askbar"><div class="askq"><b>Ja t'han pagat el lloguer de ${monthName(m)}?</b><span class="small muted">Toca ✓ quan el cobris</span></div>
     <div class="askpills">${askRent.map(c=>`<span class="apill"><span><b>${esc(propById(c.propId).name)}</b> <span class="num">${eur(split(c,m).net)}</span></span><button class="ok" data-act="quickPaid" data-id="${c.id}|${m}" title="Cobrat" aria-label="Cobrat ${esc(propById(c.propId).name)}">✓</button><button class="no" data-act="payMonth" data-id="${c.id}|${m}" title="Encara no" aria-label="Encara no">···</button></span>`).join("")}${askRent.length>1?`<button class="btn sm primary" data-act="allPaidMonth">Sí, tots</button>`:""}</div></section>` : "";
-  return `${askPanel}
-  <section class="hero hero2" aria-label="Aquest mes">
+  return `<section class="hero hero2" aria-label="Aquest mes">
     <div style="position:relative">
       ${(()=>{ const fixP=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+fixP, othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
         const fl=Math.round((expected+othInc-outOp-hip)*100)/100;
@@ -3402,7 +3405,8 @@ const ACT = {
       <div class="actions"><button class="btn primary">Desar</button></div></form>`);
     $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
       await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
-  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); }catch{ toast("No s'ha pogut desar."); } },
+  allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
   markUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:[...new Set([...(c.unpaid||[]), mo])]}); closeSheet(); toast(`${monthLabel(mo)} marcat com a no cobrat`); }catch{ toast("No s'ha pogut desar."); } },
   clearUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:(c.unpaid||[]).filter(x=>x!==mo)}); closeSheet(); toast("Marca treta"); }catch{ toast("No s'ha pogut desar."); } },
@@ -3451,6 +3455,7 @@ const ACT = {
   impRun, impStop, impSave, impEdit, impRetry: id => { const x=IMP.items.find(i=>i.id===+id); if(x){ x.status="pending"; x.err=""; impRun(); } },
   impClear: () => { IMP.items=[]; IMP.skipped=0; IMP.msg=""; IMP.hint=""; S.view="resum"; render(); }
 };
+document.addEventListener("keydown", e=>{ if((e.key==="Enter"||e.key===" ") && e.target && e.target.matches && e.target.matches("div.fcard[data-act]")){ e.preventDefault(); e.target.click(); } });
 document.addEventListener("click", e=>{
   if(e.target.closest("[data-vclose]")) return closeViewer();
   const cp=e.target.closest("[data-copy]"); if(cp){ e.preventDefault(); e.stopPropagation(); const v=cp.dataset.copy;
