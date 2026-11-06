@@ -663,7 +663,7 @@ details.folder > summary .chev{margin-right:auto}
 .htower svg{width:118px;height:auto;overflow:visible}
 .htower svg{filter:drop-shadow(0 0 3px rgb(255 196 61 / .85)) drop-shadow(0 0 12px rgb(255 196 61 / .45)) drop-shadow(0 0 26px rgb(255 170 40 / .25))}
 .tw{fill:#0E1D46;stroke:rgb(255 255 255 / .06);transition:fill .5s ease}
-.tw.on{fill:#F5B841}
+.tw.on{fill:url(#twlit)}
 .tbeacon{fill:#F5B841;animation:twblink 2.4s ease-in-out infinite}
 @keyframes twblink{0%,100%{opacity:1}50%{opacity:.25}}
 .htower .tt{display:grid;justify-items:center;line-height:1}
@@ -1062,17 +1062,33 @@ const visual = p => p && p.photo && p.photo.id ? `<img src="/_blob/${esc(p.photo
 function ring(v){ const R=58, C=2*Math.PI*R, x=Math.max(0,Math.min(1,v||0)); return `<svg viewBox="0 0 140 140" aria-hidden="true"><circle cx="70" cy="70" r="${R}" class="ring-bg"/><circle cx="70" cy="70" r="${R}" class="ring-fg" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-x)).toFixed(1)}" transform="rotate(-90 70 70)"/></svg>`; }
 
 function tower(floors){
-  const n=Math.max(1,floors.length), fh=24, top=26, H=top+n*fh+26, W=120; let w="";
-  floors.forEach((fl,i)=>{ const r=n-1-i, y=top+r*fh+6, lit=fl.none?0:Math.round(fl.f*4);
+  const n=Math.max(1,floors.length), fh=24, top=30, W=132, X0=20, FW=84, by=top+n*fh+8, H=by+22; let w="";
+  floors.forEach((fl,i)=>{ const r=n-1-i, y=top+r*fh+7, lit=fl.none?0:Math.round(fl.f*4);
     w+=`<g><title>${esc(fl.name)}: ${fl.none?"sense lloguer aquest mes":fl.f>=1?"cobrat":fl.f>0?"cobrat en part":"pendent"}</title>`;
-    for(let c=0;c<4;c++){ const x=22+c*20; w+=`<rect class="tw ${c<lit?"on":""}" style="transition-delay:${(i*4+c)*60}ms" x="${x}" y="${y}" width="12" height="13" rx="2.5"/>`; }
-    w+=`</g>`; if(r>0) w+=`<rect x="16" y="${top+r*fh}" width="88" height="1.5" fill="#3B5AAE" opacity=".35"/>`; });
-  const by=top+n*fh;
-  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><linearGradient id="twg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A4590"/><stop offset="1" stop-color="#16295E"/></linearGradient><filter id="twglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    <rect x="56" y="${top-20}" width="3" height="14" rx="1.5" fill="#3B5AAE"/><circle cx="57.5" cy="${top-21}" r="2.6" class="tbeacon"/>
-    <rect x="12" y="${top-6}" width="96" height="${n*fh+30}" rx="10" fill="url(#twg)"/><rect x="12" y="${top-6}" width="96" height="8" rx="4" fill="#3B5AAE" opacity=".6"/>
+    for(let c=0;c<4;c++){ const x=X0+9+c*18; w+=`<rect class="tw ${c<lit?"on":""}" style="transition-delay:${(i*4+c)*60}ms" x="${x}" y="${y}" width="12" height="14" rx="2.5"/><rect x="${x+1.5}" y="${y+1.5}" width="9" height="2.2" rx="1.1" fill="#fff" opacity=".12"/>`; }
+    w+=`</g>`; });
+  let bands=""; for(let r=1;r<n;r++) bands+=`<rect x="${X0}" y="${top+r*fh+2}" width="${FW}" height="1.6" fill="#6F8BE8" opacity=".22"/>`;
+  const dx=X0+FW/2;
+  return `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs>
+    <linearGradient id="twg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4466D6"/><stop offset=".55" stop-color="#2B44A2"/><stop offset="1" stop-color="#1A2A6E"/></linearGradient>
+    <linearGradient id="tws" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22357F"/><stop offset="1" stop-color="#101B4A"/></linearGradient>
+    <linearGradient id="twlit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE9A8"/><stop offset=".5" stop-color="#FFC54D"/><stop offset="1" stop-color="#F09A1E"/></linearGradient>
+    <linearGradient id="twdoor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE2A0"/><stop offset="1" stop-color="#F2A532"/></linearGradient>
+    <filter id="twglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <rect x="${dx-1.5}" y="${top-26}" width="3" height="16" rx="1.5" fill="#6F8BE8"/><circle cx="${dx}" cy="${top-27}" r="3" class="tbeacon"/>
+    <rect x="${X0+56}" y="${top-17}" width="18" height="11" rx="2.5" fill="#2E4AA8"/><rect x="${X0+58}" y="${top-8}" width="2" height="4" fill="#2E4AA8"/><rect x="${X0+70}" y="${top-8}" width="2" height="4" fill="#2E4AA8"/>
+    <path d="M${X0+FW} ${top-4} L${X0+FW+12} ${top+2} L${X0+FW+12} ${by+13} L${X0+FW} ${by+16} Z" fill="url(#tws)"/>
+    <rect x="${X0}" y="${top-4}" width="${FW}" height="${by-top+20}" rx="6" fill="url(#twg)"/>
+    <rect x="${X0}" y="${top-4}" width="3" height="${by-top+20}" rx="1.5" fill="#fff" opacity=".1"/>
+    <rect x="${X0-4}" y="${top-8}" width="${FW+8}" height="7" rx="3.5" fill="#5B7BE6"/><path d="M${X0+FW+4} ${top-8} L${X0+FW+14} ${top-3} L${X0+FW+14} ${top+1} L${X0+FW+4} ${top-1} Z" fill="#3A56B8"/>
+    ${bands}
     <g filter="url(#twglow)">${w}</g>
-    <rect x="50" y="${by+4}" width="20" height="20" rx="3" fill="#0B1634"/><rect x="4" y="${by+22}" width="112" height="4" rx="2" fill="#3B5AAE" opacity=".5"/></svg>`;
+    <rect x="${dx-15}" y="${by-2}" width="30" height="4" rx="2" fill="#5B7BE6"/>
+    <path d="M${dx-9} ${by+16} V${by+8} a9 7 0 0 1 18 0 V${by+16} Z" fill="url(#twdoor)" filter="url(#twglow)"/>
+    <rect x="${dx-0.6}" y="${by+4}" width="1.2" height="12" fill="#C9781A" opacity=".55"/>
+    <rect x="${X0-10}" y="${by+15}" width="${FW+30}" height="5" rx="2.5" fill="#3A56B8" opacity=".7"/>
+    <circle cx="${X0-3}" cy="${by+11}" r="5" fill="#1F8A5B"/><circle cx="${X0+1}" cy="${by+13}" r="3.6" fill="#2BAA72"/>
+    <circle cx="${X0+FW+6}" cy="${by+11}" r="5" fill="#1F8A5B"/><circle cx="${X0+FW+2}" cy="${by+13}" r="3.6" fill="#2BAA72"/></svg>`;
 }
 function skyline(){ let x=0, r=""; let st=7; const rnd=()=>{ st=(st*16807)%2147483647; return st/2147483647; }; while(x<1200){ const w=30+rnd()*60, h=20+rnd()*70; r+=`<rect x="${x.toFixed(0)}" y="${(90-h).toFixed(0)}" width="${w.toFixed(0)}" height="${h.toFixed(0)}"/>`; x+=w+4; } return `<svg class="skyline" viewBox="0 0 1200 90" preserveAspectRatio="none" aria-hidden="true">${r}</svg>`; }
 function renderRail(){
