@@ -1356,7 +1356,7 @@ function flowCard(vm){
 function flatTiles(){
   const ps=sortedProps(); if(!ps.length) return `<p class="muted">Encara no hi ha pisos.</p>`;
   let end="", start="";
-  const tiles=ps.map((p,k)=>{ const f=flatSeries(p), c=flatCol(p), r=metrics(p).rentM; end=f.end; start=f.months[0];
+  const tiles=ps.map((p,k)=>{ const f=flatSeries(p), c=flatCol(p), cs=current(p.id), r=cs.length?sum(cs,x=>split(x,curMonth()).net):0; end=f.end; start=f.months[0];
     return `<button type="button" class="ftile" style="--c:${c}" data-act="openProp" data-id="${p.id}"><span class="fth"><span class="ftav">${visual(p)}</span><span class="ftn"><b>${esc(shortProp(p.name))}</b><small>${r?eur0(r)+"/mes":"Sense contracte"}</small></span></span><span class="ftv num">${eur0(f.tot)}</span><span class="ftt">${trendTag(f.t)}${f.out>=1?`<span class="ftout">−${eur0(f.out)}</span>`:""}</span>${spark(f.a,c,"tsk"+k,160,46,f.b)}</button>`; }).join("");
   return `<div class="ftiles">${tiles}</div>`;
 }
