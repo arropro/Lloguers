@@ -719,6 +719,46 @@ body.priv main .num::after, body.priv main .big::after, body.priv main .famt::af
 body.priv main .num .small::after, body.priv main .num .num::after, body.priv main .small .small::after, body.priv main .r .small .num::after{display:none}
 body.priv main .big::after{height:.16em;width:min(100%,5.2em);opacity:.7}
 body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;right:0}
+
+.flow{margin-top:14px;padding:14px 14px 10px;border-radius:20px;border:1px solid var(--line);background:linear-gradient(180deg,color-mix(in srgb,var(--in) 7%,var(--surface)),var(--surface))}
+.flh{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:6px}
+.flh > div{display:grid;gap:2px;min-width:0}
+.flh small{font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:5px}
+.flh small i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.flh b{font-size:1rem;white-space:nowrap}
+.flm{display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-top:2px}
+.ftt{display:flex;justify-content:space-between;gap:6px;align-items:baseline}
+.ftout{color:var(--out);font-size:.74rem;white-space:nowrap}
+.plg{display:flex;gap:14px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin-top:2px}
+.plg span{display:flex;align-items:center;gap:5px}.plg i{width:12px;height:3px;border-radius:2px;display:inline-block}
+.plg i.dsh{background:repeating-linear-gradient(90deg,var(--out) 0 4px,transparent 4px 7px)}
+.netpill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px 7px 8px;border-radius:999px;
+  background:linear-gradient(120deg,color-mix(in srgb,#F5B931 22%,transparent),color-mix(in srgb,var(--in) 22%,transparent));
+  border:1px solid color-mix(in srgb,#F5B931 45%,transparent);box-shadow:0 8px 22px -14px #F5B931}
+.netpill .ni{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#7B5CFF,#4A2FD1);box-shadow:0 0 0 2px rgb(255 255 255 / .85),0 4px 14px -4px #6A4BF0;font-size:15px}
+.netpill .nt{font-weight:600}
+.netpill b{font-weight:800;font-size:1.05em;background:linear-gradient(90deg,#F2A31B,var(--in));-webkit-background-clip:text;background-clip:text;color:transparent}
+/* targetes per pis */
+.ftiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.ftile{font:inherit;color:inherit;text-align:left;cursor:pointer;position:relative;display:grid;gap:2px;align-content:start;padding:12px 12px 8px;border-radius:20px;overflow:hidden;min-width:0;
+  background:radial-gradient(120% 90% at 0% 0%, color-mix(in srgb,var(--c) 20%,transparent),transparent 62%),var(--surface);
+  border:1px solid color-mix(in srgb,var(--c) 38%,var(--line));box-shadow:0 14px 30px -22px var(--c);transition:transform .18s ease, box-shadow .18s ease}
+.ftile:hover{transform:translateY(-2px);box-shadow:0 18px 34px -18px var(--c)}
+.fth{display:flex;align-items:center;gap:9px;min-width:0}
+.ftav{width:38px;height:38px;flex:none;border-radius:12px;overflow:hidden;border:2px solid var(--c);display:block;background:var(--line)}
+.ftav img,.ftav svg{width:100%;height:100%;object-fit:cover;display:block}
+.ftn{min-width:0}.ftn b{display:block;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftn small{display:block;font-size:.72rem;color:var(--muted)}
+.ftv{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin-top:10px;white-space:nowrap}
+.ftt{font-size:.78rem;min-height:1.1em}
+.tup{color:var(--in);font-weight:700}.tdn{color:var(--out);font-weight:700}
+.spk{display:block;width:100%;height:auto;margin-top:4px;overflow:visible}
+.ftnote{font-size:.75rem;color:var(--muted);margin:12px 2px 0;line-height:1.4}
+.pspk{display:grid;gap:2px}
+.psh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.psh small{font-size:.72rem;color:var(--muted)}
+.psh span{display:flex;gap:8px;align-items:baseline;font-size:.9rem}
+.psh .tup,.psh .tdn{font-size:.78rem}
 </style>
 
 <div class="shell">
@@ -1029,7 +1069,7 @@ function renderRail(){
 // Els imports grans s'encongeixen si no hi caben (així no es tallen al mòbil).
 function fitNums(){
   requestAnimationFrame(()=>{
-    document.querySelectorAll("main .hero .big, main .hstats .num").forEach(el=>{
+    document.querySelectorAll("main .hero .big, main .hstats .num, main .ftile .ftv").forEach(el=>{
       el.style.fontSize=""; el.style.whiteSpace="nowrap"; el.style.display="inline-block"; el.style.maxWidth="none";
       const box=el.parentElement; if(!box) return;
       const cs=getComputedStyle(box), avail=box.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
@@ -1136,8 +1176,8 @@ function viewResum(){
     ${todo.length? `<ul class="todo">${todo.slice(0,4).map(todoLi).join("")}</ul>${todo.length>4?`<details class="fold" data-fold="todo-more"${S.open.has("todo-more")?" open":""}><summary><span>Veure ${todo.length-4} més</span>${CHEV}</summary><ul class="todo" style="margin-top:10px">${todo.slice(4).map(todoLi).join("")}</ul></details>`:""}` : `<p class="muted">Tot al dia: lloguers anotats, contractes vigents i fiances en ordre.</p>`}
   </section>
   <section class="panel">
-    <div class="panel-h"><h2>Últims 12 mesos</h2><div class="legend"><span><i style="background:var(--in)"></i>Ingressos</span><span><i style="background:var(--out)"></i>Despeses${anyM?" i hipoteca":""}</span></div></div>
-    ${chart12(vm)}
+    <div class="panel-h"><h2>Últims 12 mesos</h2></div>
+    ${flatTiles()}
     ${yearLine(vm)}
   </section>
   <section class="panel gestor"><button type="button" class="gbtn" data-act="gestor"><span class="gic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span><span class="gtx"><b>Preparar per al gestor</b><small>Tria l'any i et preparo l'Excel amb totes les factures, en un sol fitxer</small></span></button></section>`;
@@ -1150,7 +1190,7 @@ function yearLine(vm){
   const y=today().slice(0,4), ym=vm.filter(x=>String(x.date).startsWith(y));
   const inc=sum(ym.filter(x=>x.type==="ingres")), out=sum(ym.filter(x=>x.type==="despesa" && x.category!=="Despeses de compra")), inv=sum(ym.filter(x=>x.type==="despesa" && x.category==="Despeses de compra"));
   let hip=0; for(let mo=y+"-01"; mo<=curMonth(); mo=addMonths(mo,1)) hip+=mtgMonthAll(mo);
-  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span>Net <b class="num">${eur(inc-out-hip)}</b></span>${inv?`<span class="muted">+ despeses de compra ${eur(inv)}</span>`:""}</div>`;
+  return `<div class="totals" style="margin-top:10px"><span class="muted">Any ${y}:</span><span>Ingressos <b class="num pos">${eur(inc)}</b></span><span>Despeses <b class="num neg">${eur(out)}</b></span>${hip?`<span>Hipoteca <b class="num neg">${eur(hip)}</b></span>`:""}<span class="netpill"><span class="ni">💰</span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
 }
 
 function niceMax(v){ if(v<=0) return 100; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
@@ -1169,6 +1209,49 @@ function chart12(vm){
     s+=`<rect class="bout" x="${cx+1}" y="${y(x.out)}" width="${bw}" height="${Math.max(0,H-B-y(x.out))}" rx="4"><title>${monthName(x.m)}: despeses ${eur(x.out)}</title></rect>`;
     s+=`<text x="${cx}" y="${H-8}" text-anchor="middle">${monthName(x.m,"short")}</text>`; });
   return `<div class="tbl-wrap">${s}</svg></div>`;
+}
+
+/* ---------- Targetes per pis (12 mesos) ---------- */
+const FLATCOL=["#3987e5","#d95926","#199e70","#c98500","#9b6ad6","#2ba3b8"];
+const flatCol = p => FLATCOL[Math.max(0,sortedProps().findIndex(x=>x.id===p.id))%FLATCOL.length];
+const eur0 = n => Math.round(Number(n)||0).toLocaleString("ca-ES")+" €";
+const shortProp = n => String(n||"").replace(/^pis\s+/i,"").replace(/\s*\(.*?\)\s*$/,"");
+function flatSeries(p){
+  const end=addMonths(curMonth(),-1), months=[]; for(let i=11;i>=0;i--) months.push(addMonths(end,-i));
+  const ms=movesOf(p.id).filter(x=>x.type==="ingres"&&x.category!=="Fiança");
+  const a=months.map(m=>sum(ms.filter(x=>ymOf(x.date)===m)));
+  const l3=a[9]+a[10]+a[11], p3=a[6]+a[7]+a[8], M=mtg(p);
+  const ds=movesOf(p.id).filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra");
+  const b=months.map(m=>sum(ds.filter(x=>ymOf(x.date)===m))+(M?mtgPay(M,m):0));
+  return {a, b, out:sum(b,x=>x), months, end, tot:sum(a,x=>x), t: p3 ? Math.round((l3-p3)/p3*100) : null};
+}
+function spark(a,c,id,W=160,H=46,b){
+  const mx=Math.max(...a,...(b||[]))||1, P=arr=>arr.map((v,i)=>[4+i*(W-8)/(arr.length-1), H-5-(H-14)*v/mx]), pts=P(a);
+  const curve=pts=>{ let d=`M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`; for(let i=1;i<pts.length;i++){ const cx=((pts[i-1][0]+pts[i][0])/2).toFixed(1); d+=` C${cx} ${pts[i-1][1].toFixed(1)} ${cx} ${pts[i][1].toFixed(1)} ${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)}`; } return d; };
+  const d=curve(pts), l=pts[pts.length-1];
+  let o=""; if(b&&b.some(v=>v>0)){ const q=P(b), e=q[q.length-1]; o=`<path d="${curve(q)}" fill="none" stroke="var(--out)" stroke-width="1.8" stroke-dasharray="4 3" stroke-linecap="round" opacity=".9"/><circle cx="${e[0].toFixed(1)}" cy="${e[1].toFixed(1)}" r="2.6" fill="var(--out)"/>`; }
+  return `<svg class="spk" viewBox="0 0 ${W} ${H}" aria-hidden="true">${o}<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".45"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${l[0].toFixed(1)} ${H} L${pts[0][0]} ${H}Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${c}" stroke-width="5" stroke-opacity=".22" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cx="${l[0].toFixed(1)}" cy="${l[1].toFixed(1)}" r="3.6" fill="var(--surface)" stroke="${c}" stroke-width="2.6"/></svg>`;
+}
+const trendTag = t => t===null ? "" : `<b class="${t>=0?"tup":"tdn"}" title="Últims 3 mesos comparats amb els 3 d'abans">${t>=0?"▲":"▼"} ${Math.abs(t)}%</b>`;
+
+function flowCard(vm){
+  const end=addMonths(curMonth(),-1), months=[]; for(let i=11;i>=0;i--) months.push(addMonths(end,-i));
+  const inc=months.map(m=>sum(vm.filter(x=>ymOf(x.date)===m&&x.type==="ingres"&&x.category!=="Fiança")));
+  const out=months.map(m=>sum(vm.filter(x=>ymOf(x.date)===m&&x.type==="despesa"&&x.category!=="Despeses de compra"))+mtgMonthAll(m));
+  const W=340,H=96,mx=Math.max(...inc,...out)||1, X=i=>6+i*(W-12)/11, Y=v=>H-8-(H-20)*v/mx;
+  const path=a=>{ let d=`M${X(0).toFixed(1)} ${Y(a[0]).toFixed(1)}`; for(let i=1;i<12;i++){ const cx=((X(i-1)+X(i))/2).toFixed(1); d+=` C${cx} ${Y(a[i-1]).toFixed(1)} ${cx} ${Y(a[i]).toFixed(1)} ${X(i).toFixed(1)} ${Y(a[i]).toFixed(1)}`; } return d; };
+  const line=(a,c,id)=>`<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".32"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${path(a)} L${X(11)} ${H} L${X(0)} ${H}Z" fill="url(#${id})"/><path d="${path(a)}" fill="none" stroke="${c}" stroke-width="5" stroke-opacity=".2" stroke-linecap="round"/><path d="${path(a)}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/><circle cx="${X(11).toFixed(1)}" cy="${Y(a[11]).toFixed(1)}" r="3.6" fill="var(--surface)" stroke="${c}" stroke-width="2.6"/>`;
+  const ti=sum(inc,x=>x), to=sum(out,x=>x), net=ti-to;
+  return `<div class="flow"><div class="flh"><div><small><i style="background:var(--in)"></i>Entrades</small><b class="num tup">${eur0(ti)}</b></div><div><small><i style="background:var(--out)"></i>Sortides</small><b class="num tdn">${eur0(to)}</b></div><div><small>Et queda</small><b class="num">${eur0(net)}</b></div></div>
+  <svg class="spk" viewBox="0 0 ${W} ${H}" role="img" aria-label="Entrades i sortides dels últims 12 mesos">${line(out,"var(--out)","flo")}${line(inc,"var(--in)","fli")}</svg>
+  <div class="flm"><span>${monthName(months[0],"short")}</span><span>${monthName(end,"short")}</span></div></div>`;
+}
+function flatTiles(){
+  const ps=sortedProps(); if(!ps.length) return `<p class="muted">Encara no hi ha pisos.</p>`;
+  let end="", start="";
+  const tiles=ps.map((p,k)=>{ const f=flatSeries(p), c=flatCol(p), r=metrics(p).rentM; end=f.end; start=f.months[0];
+    return `<button type="button" class="ftile" style="--c:${c}" data-act="openProp" data-id="${p.id}"><span class="fth"><span class="ftav">${visual(p)}</span><span class="ftn"><b>${esc(shortProp(p.name))}</b><small>${r?eur0(r)+"/mes":"Sense contracte"}</small></span></span><span class="ftv num">${eur0(f.tot)}</span><span class="ftt">${trendTag(f.t)}${f.out>=1?`<span class="ftout">−${eur0(f.out)}</span>`:""}</span>${spark(f.a,c,"tsk"+k,160,46,f.b)}</button>`; }).join("");
+  return `<div class="ftiles">${tiles}</div>`;
 }
 function emptyStart(){
   return `<section class="panel empty"><h2>Comença afegint els teus pisos</h2>
@@ -1191,7 +1274,7 @@ function viewProps(){
       <div class="addr">${esc(p.address||"Sense adreça")}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${cs.length?`<span class="chip ok" title="${esc(cs.map(c=>c.tenantName).join(" / "))}">${cs.length===1?esc(shortName(cs[0].tenantName)||"Llogat"):cs.length+" contractes vigents"}</span>${unpaid?`<span class="chip warn">${monthName(m)} pendent</span>`:`<span class="chip ok">${monthName(m)} cobrat</span>`}`:`<span class="chip">${p.vacant?"Sense llogar":"Sense contracte vigent"}</span>`}</div>
       ${(()=>{ const c=completeness(p); return c.pct<100?`<div class="pcomp"><span>Fitxa ${c.pct}%</span><div class="bar"><i style="width:${c.pct}%"></i></div></div>`:""; })()}
-      ${cs.length?(()=>{ const y=today().slice(0,4), g=earned(p,y); return `<div class="foot fa"><div class="fah"><div title="Ingressos del ${y} menys les despeses i els interessos de la hipoteca del ${y} (sense comptar millores ni despeses de compra)"><small>Guany ${y}</small><span class="num fbig ${g>=0?"pos":"neg"}">${eur(g)}</span></div><div class="far"><small>${isEmp(p)?"Ingrés mitjà":"Renda"}</small><span class="num">${eur(k.rentM)}<span class="small muted">/mes</span></span></div></div><div class="fap"><span><small>Rendibilitat Bruta</small><b class="num">${pct(k.gross)}</b></span><span><small>Rendibilitat Neta</small><b class="num">${pct(k.net)}</b></span></div></div>`; })():`<div class="foot nofoot"><span class="muted">${isEmp(p)?"Afegeix l'empresa que el té llogat i l'import mensual per veure'n la renda i la rendibilitat.":p.vacant?"Sense llogar ara mateix.":"Afegeix el contracte per veure'n la renda i la rendibilitat."}</span></div>`}
+      ${cs.length?(()=>{ const y=today().slice(0,4), g=earned(p,y); const fs=flatSeries(p); return `<div class="foot fa"><div class="pspk"><div class="psh"><small>Cobrat els últims 12 mesos</small><span><b class="num">${eur0(fs.tot)}</b>${trendTag(fs.t)}</span></div>${spark(fs.a,flatCol(p),"psk"+p.id,300,56,fs.b)}<div class="plg"><span><i style="background:${flatCol(p)}"></i>Cobrat</span><span><i class="dsh"></i>Despeses i hipoteca ${eur0(fs.out)}</span></div></div><div class="fah"><div title="Ingressos del ${y} menys les despeses i els interessos de la hipoteca del ${y} (sense comptar millores ni despeses de compra)"><small>Guany ${y}</small><span class="num fbig ${g>=0?"pos":"neg"}">${eur(g)}</span></div><div class="far"><small>${isEmp(p)?"Ingrés mitjà":"Renda"}</small><span class="num">${eur(k.rentM)}<span class="small muted">/mes</span></span></div></div><div class="fap"><span><small>Rendibilitat Bruta</small><b class="num">${pct(k.gross)}</b></span><span><small>Rendibilitat Neta</small><b class="num">${pct(k.net)}</b></span></div></div>`; })():`<div class="foot nofoot"><span class="muted">${isEmp(p)?"Afegeix l'empresa que el té llogat i l'import mensual per veure'n la renda i la rendibilitat.":p.vacant?"Sense llogar ara mateix.":"Afegeix el contracte per veure'n la renda i la rendibilitat."}</span></div>`}
       </span>
     </button>`; }).join("")}</div></section>`;
 }
