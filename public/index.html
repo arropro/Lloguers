@@ -772,6 +772,9 @@ canvas.fw{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z
 .chkok{display:flex;gap:14px;align-items:flex-start;padding:6px 2px}
 .chkok > span{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--in) 18%,transparent);color:var(--in);font-weight:800;font-size:22px}
 .chkok p{margin:4px 0 0}
+.slist.fact li{display:flex;justify-content:space-between;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.slist.fact li.tot{font-weight:800;border-bottom:0;border-top:2px solid var(--ink)}
+.spin{animation:spin 1.6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1757,7 +1760,7 @@ function dataIssues(){
   S.contracts.filter(c=>propById(c.propId)).forEach(c=>{ for(let i=24;i>=1;i--){ const mo=addMonths(curMonth(),-i), ms=rentMoves(c,mo); if(!ms.length||ms.every(x=>x.okExtra)) continue;
     const got=sum(ms), exp=split(c,mo).net; if(exp>0 && got>exp*1.15+5){ const big=[...ms].sort((a,b)=>b.amount-a.amount)[0];
       out.push({k:"warn", chip:"Import alt", t:`<b>${pn(c.propId)}</b> · ${esc(c.tenantName||"")}<div class="small muted">${monthLabel(mo)}: cobrat ${eur(got)} i la renda és ${eur(exp)} (${eur(got-exp)} de més)</div>`,
-        act:`<button class="btn sm primary" data-act="chkFian" data-id="${big.id}|${Math.round((got-exp)*100)/100}">Hi ha la fiança a dins</button><button class="btn sm" data-act="chkOk" data-id="${ms.map(x=>x.id).join(",")}">És correcte</button>`}); } } });
+        act:`${ms.some(x=>x.docId)?`<button class="btn sm primary" data-act="chkRead" data-id="${ms.map(x=>x.id).join(",")}">Llegeix la factura</button>`:""}<button class="btn sm${ms.some(x=>x.docId)?"":" primary"}" data-act="chkFian" data-id="${big.id}|${Math.round((got-exp)*100)/100}">Hi ha la fiança</button><button class="btn sm" data-act="chkOk" data-id="${ms.map(x=>x.id).join(",")}">És correcte</button>`}); } } });
   // 4. Imports o dates estranyes
   vm.filter(x=>!(+x.amount>0)||!isDate(x.date)).forEach(x=>out.push({k:"bad", chip:"Import", t:`<b>${pn(x.propId)}</b><div class="small muted">Moviment sense import o sense data: ${esc(x.concept||x.category||"")}</div>`, act:`<button class="btn sm" data-act="editMove" data-id="${x.id}">Arreglar</button>`}));
   vm.filter(x=>isDate(x.date)&&x.date>dShift(31)).forEach(x=>out.push({k:"warn", chip:"Data", t:`<b>${pn(x.propId)}</b><div class="small muted">Té una data molt endavant: ${line(x)}</div>`, act:`<button class="btn sm" data-act="editMove" data-id="${x.id}">Revisar</button>`}));
@@ -1773,6 +1776,28 @@ function checkData(){
     : `<div class="chkok"><span>✓</span><div><b>Tot quadra</b><p class="muted">He revisat els cobraments, les despeses, els contractes i les hipoteques i no he trobat res estrany.</p></div></div>`);
 }
 const chkAgain = () => { if(document.querySelector("#sheet")) checkData(); };
+// Llegeix les factures d'un mes amb Claude i explica d'on surt la diferència amb la renda.
+async function chkRead(ids){
+  const ms=ids.split(",").map(id=>S.moves.find(m=>m.id===id)).filter(Boolean); if(!ms.length) return;
+  const docs=ms.filter(m=>m.docId); const c=conById(ms[0].contractId), mo=movePeriod(ms[0]), exp=c?split(c,mo).net:0, got=sum(ms);
+  if(!docs.length){ toast("Aquest cobrament no té cap document guardat"); return; }
+  if(!sample){ toast(aiErr("not_granted")); return; }
+  openSheet("Llegint la factura…", `<div class="chkok"><span class="spin">⏳</span><div><b>Estic llegint ${docs.length>1?"els documents":"el document"}</b><p class="muted">Tarda uns segons.</p></div></div>`);
+  try{
+    let text="", imgs=[];
+    for(const m of docs){ const blob=await (await fetch("/_blob/"+m.docId,{credentials:"same-origin"})).blob();
+      if(/pdf/.test(m.docMime||blob.type)){ const pdf=await loadPdf(blob); const t=await pdfText(pdf,6); if(t.chars>200) text+=`\n[Document ${m.docName||""}]${t.text}`; else for(let i=1;i<=Math.min(2,pdf.numPages);i++) imgs.push(await pageJpeg(pdf,i)); }
+      else imgs.push(await prepUpload(blob)); }
+    const r=await sample.json(`Ets un assistent de lloguers. El propietari ha cobrat ${got} € pel lloguer de ${monthLabel(mo)} i segons el contracte la renda mensual és ${exp} €. Llegeix la factura i desglossa-la.
+Respon NOMÉS amb JSON: {"linies":[{"concepte":"text curt en català","import":número amb IVA}],"total":número,"fianca":número (0 si no n'hi ha),"comissio":número (0 si no n'hi ha),"explicacio":"1-2 frases en català, senzilles, que expliquin per què el total és diferent de la renda"}
+${text?"Text de la factura:\n"+text.slice(0,12000):""}`, imgs.length?{images:imgs}:{});
+    const L=(r&&Array.isArray(r.linies))?r.linies:[], fi=+r.fianca||0;
+    openSheet("Què diu la factura", `<div class="form">
+      ${L.length?`<ul class="slist fact">${L.map(l=>`<li><span>${esc(l.concepte||"")}</span><b class="num">${eur(+l.import||0)}</b></li>`).join("")}<li class="tot"><span>Total</span><b class="num">${eur(+r.total||got)}</b></li></ul>`:""}
+      ${r.explicacio?`<div class="note">${esc(r.explicacio)}</div>`:""}
+      <div class="actions">${fi>0?`<button type="button" class="btn" data-act="chkFian" data-id="${[...ms].sort((a,b)=>b.amount-a.amount)[0].id}|${fi}">Separar la fiança (${eur(fi)})</button>`:""}<button type="button" class="btn primary" data-act="chkOk" data-id="${ids}">${fi>0?"Deixar-ho així":"D'acord, és correcte"}</button></div></div>`);
+  }catch(e){ console.warn("chkRead",e); openSheet("No he pogut llegir-la", `<p class="muted">${esc(aiErr(e&&e.code)||"Torna-ho a provar d'aquí a una estona.")}</p><div class="actions"><button type="button" class="btn" data-act="checkData">Enrere</button></div>`); }
+}
 async function chkFianGo(mid){
   const x=S.moves.find(m=>m.id===mid); if(!x) return; const v=Math.round(parseFloat(String($("#chk-f").value).replace(",","."))*100)/100;
   if(!(v>0) || v>=x.amount){ toast("Posa un import més petit que el cobrament"); return; }
@@ -3461,6 +3486,7 @@ const ACT = {
   chkFian: key => { const [id,v]=key.split("|"); const x=S.moves.find(m=>m.id===id); if(!x) return; const c=conById(x.contractId); const sug=+v, dep=(c&&+c.deposit>0)?+c.deposit:0;
     openSheet("Separar la fiança", `<div class="form"><p class="muted">${fmtDate(x.date)} · cobrament de ${eur(x.amount)}. Quina part era la fiança?</p><label class="field"><span>Import de la fiança</span><input id="chk-f" type="text" inputmode="decimal" value="${String(sug).replace(".",",")}"></label><p class="small muted">${dep?`Al contracte hi consta una fiança de ${eur(dep)}. `:""}Es restarà del lloguer i quedarà anotada com a fiança, que no compta com a ingrés.</p><div class="actions"><button type="button" class="btn ghost" data-act="checkData">Enrere</button><button type="button" class="btn primary" data-act="chkFianGo" data-id="${id}">Separar</button></div></div>`); },
   chkFianGo: id => chkFianGo(id),
+  chkRead: ids => chkRead(ids),
   quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); }catch{ toast("No s'ha pogut desar."); } },
   allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
