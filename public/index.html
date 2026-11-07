@@ -883,9 +883,14 @@ async function init(){
   listen("docs", db.collection("docs"));
   listen("inbox", db.collection("inbox"));
   c.use("assets").then(a=>{ assets=a; }).catch(()=>{});
+  aiBalance();
   c.use("downloads").then(d=>{ downloadsCap=d; }).catch(()=>{});
   c.use("sample").then(async s=>{ sample=s; if(s){ const l=await s.limits().catch(()=>null); imgOk=!!(l&&l.images); maxImg=(l&&l.images&&l.images.maxCount)||0; } scheduleAuto(); }).catch(()=>{});
 }
+// Saldo de la IA (només a l'app pròpia): avisa a "Per revisar" quan se n'acaba.
+function aiBalance(){ if(!window.LLOGUERS_STANDALONE) return; fetch("/api/ai/balance",{credentials:"same-origin"}).then(r=>r.ok?r.json():null).then(b=>{ S.aiBal=b; render(); }).catch(()=>{}); }
+setInterval(()=>{ if(document.visibilityState==="visible") aiBalance(); }, 10*60*1000);
+window.addEventListener("ai-nobal", ()=>setTimeout(aiBalance,500));
 function listen(key, q){
   q.onSnapshot(snap=>{ S[key]=snap.docs.map(d=>({id:d.id,...d.data()})); S.loaded[key]=true; render(); scheduleAuto(); },
                e=>{ S.err=e.code||"unavailable"; render(); });
@@ -1250,6 +1255,7 @@ function viewResum(){
   const missAll=allMissing(); if(missAll.length) todo.push({k:"warn", chip:"Documents", fold:true, t:`<b>Falten documents a ${missAll.length} pis${missAll.length>1?"os":""}</b><div class="small muted">${missAll.map(({p,m})=>esc(p.name)+" ("+m.length+")").join(" · ")}</div>`, act:"", sub:missAll.map(({p,m})=>`<li><div class="t"><b>${esc(p.name)}</b><div class="small muted">${m.slice(0,3).map(x=>x.txt).join(" · ")}${m.length>3?` i ${m.length-3} més`:""}</div></div><button class="btn sm" data-act="openProp" data-id="${p.id}">Veure</button></li>`).join("")});
   if(0) allMissing().forEach(({p,m})=>todo.push({k:"warn", chip:"Falten documents", t:`<b>${esc(p.name)}</b><div class="small muted">${m.length===1?"Et falta ":"Et falten: "}${m.slice(0,3).map(x=>x.txt).join(" · ")}${m.length>3?` i ${m.length-3} més`:""}</div>`, act:`<button class="btn sm" data-act="openProp" data-id="${p.id}">Veure què falta</button>`}));
   if(S.inbox.length) todo.unshift({k:"warn", chip:"Escanejar", t:`<b>${S.inbox.length} document${S.inbox.length>1?"s":""} per revisar</b><div class="small muted">Escanejats però pendents que em diguis on van</div>`, act:`<button class="btn sm scanb" data-act="scan">${SCANICON}Revisar</button>`});
+  { const b=S.aiBal; if(b && (b.empty||b.low)) todo.unshift({k:b.empty?"bad":"warn", chip:"Saldo IA", t:`<b>${b.empty?"La IA s'ha quedat sense saldo":"Queda poc saldo per a la IA"}</b><div class="small muted">${b.empty?"No es poden llegir documents fins que el recarreguis.":`Et queden uns ${String((Math.max(0,b.remaining)).toFixed(2)).replace(".",",")} $.`} Recarrega'l a Anthropic i després escriu el saldo nou a ⚙︎.</div>`, act:`<a class="btn sm primary" href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener">Recarregar</a><a class="btn sm" href="/copia.html#ia">Ja l'he recarregat</a>`}); }
   const noProp = vm.filter(x=>!x.propId).length;
   if(noProp) todo.push({k:"warn", chip:"Sense pis", t:`<b>${noProp} moviment${noProp>1?"s":""} sense pis assignat</b><div class="small muted">No compten a cap pis fins que no els assignis</div>`, act:`<button class="btn sm" data-act="looseMoves">Revisar</button>`});
 

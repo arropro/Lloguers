@@ -118,7 +118,7 @@ async function askClaude(env, request) {
     const msg = (data && data.error && data.error.message) || "";
     if (res.status === 429 || res.status === 529) return err("rate_limited", 429, msg);
     if (res.status === 401 || res.status === 403) return err("not_granted", 503, "Clau d'Anthropic no vàlida");
-    if (res.status === 400 && /credit|balance|billing/i.test(msg)) return err("rate_limited", 402, "Sense saldo a Anthropic");
+    if (res.status === 400 && /credit|balance|billing/i.test(msg)) { try { await noBalance(env); } catch {} return err("rate_limited", 402, "Sense saldo a Anthropic"); }
     if (res.status === 400 && /image/i.test(msg)) return err("image_rejected", 400, msg);
     if (res.status === 413) return err("too_large", 413, msg);
     return err("upstream_error", 502, msg);
@@ -131,7 +131,40 @@ async function askClaude(env, request) {
     await env.DB.prepare("INSERT INTO ai_usage (month, calls, input, output) VALUES (?, 1, ?, ?) ON CONFLICT(month) DO UPDATE SET calls = calls + 1, input = input + excluded.input, output = output + excluded.output")
       .bind(month, (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0), u.output_tokens || 0).run();
   } catch { /* el comptador no és imprescindible */ }
+  try { await spend(env, data.usage || {}); } catch {}
   return json({ text, truncated: data.stop_reason === "max_tokens" });
+}
+
+// ---------- saldo de la IA ----------
+// Anthropic no deixa consultar el saldo amb la clau, així que l'app el porta ella:
+// tu poses el saldo que tens i cada lectura en resta el cost aproximat.
+const PRICE_IN = 3 / 1e6, PRICE_OUT = 15 / 1e6;   // $ per token (aproximat, una mica per sobre)
+const LOW_BALANCE = 2;                              // avisa quan quedin menys de 2 $
+async function getSet(env, k) { const r = await env.DB.prepare("SELECT v FROM settings WHERE k = ?").bind(k).first(); return r ? r.v : null; }
+async function putSet(env, k, v) { if (v === null) return env.DB.prepare("DELETE FROM settings WHERE k = ?").bind(k).run(); return env.DB.prepare("INSERT INTO settings (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(k, String(v)).run(); }
+async function balanceInfo(env) {
+  const bal = await getSet(env, "ai_balance"), spent = +(await getSet(env, "ai_spent")) || 0, nobal = await getSet(env, "ai_nobal");
+  const b = bal === null ? null : +bal;
+  return { balance: b, spent: Math.round(spent * 100) / 100, remaining: b === null ? null : Math.round((b - spent) * 100) / 100, low: b !== null && b - spent < LOW_BALANCE, empty: !!nobal, emptySince: nobal ? +nobal : null, lowAt: LOW_BALANCE };
+}
+async function pushAll(env, msg) {
+  await putSet(env, "push_msg", JSON.stringify(msg));
+  const { results } = await env.DB.prepare("SELECT endpoint FROM push_subs").all();
+  for (const r of results) { try { await sendPush(env, r.endpoint); } catch {} }
+}
+async function spend(env, u) {
+  const cost = ((u.input_tokens || 0) + (u.cache_creation_input_tokens || 0)) * PRICE_IN + (u.cache_read_input_tokens || 0) * PRICE_IN * 0.1 + (u.output_tokens || 0) * PRICE_OUT;
+  const spent = (+(await getSet(env, "ai_spent")) || 0) + cost; await putSet(env, "ai_spent", spent.toFixed(4));
+  if (await getSet(env, "ai_nobal")) await putSet(env, "ai_nobal", null);
+  const bal = await getSet(env, "ai_balance");
+  if (bal !== null && +bal - spent < LOW_BALANCE && !(await getSet(env, "ai_lowsent"))) {
+    await putSet(env, "ai_lowsent", "1");
+    await pushAll(env, { title: "Queda poc saldo per a la IA", body: `Et queden uns ${Math.max(0, +bal - spent).toFixed(2).replace(".", ",")} $ a Anthropic. Recarrega'l per continuar escanejant documents.` });
+  }
+}
+async function noBalance(env) {
+  const prev = +(await getSet(env, "ai_nobal")) || 0; await putSet(env, "ai_nobal", Date.now());
+  if (Date.now() - prev > 20 * 3600e3) await pushAll(env, { title: "La IA s'ha quedat sense saldo", body: "No es poden llegir documents fins que recarreguis el saldo a console.anthropic.com." });
 }
 
 
@@ -302,6 +335,13 @@ async function api(request, env, url) {
   if (p === "/api/ai/usage" && m === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM ai_usage ORDER BY month DESC LIMIT 12").all();
     return json({ usage: results, model: env.AI_MODEL || DEFAULT_MODEL });
+  }
+  if (p === "/api/ai/balance" && m === "GET") return json(await balanceInfo(env));
+  if (p === "/api/ai/balance" && m === "POST") {
+    const b = await request.json().catch(() => ({})); const v = Math.round(parseFloat(String(b.balance ?? "").replace(",", ".")) * 100) / 100;
+    if (!(v >= 0) || v > 100000) return err("invalid", 400, "Import no vàlid");
+    await putSet(env, "ai_balance", v); await putSet(env, "ai_spent", "0"); await putSet(env, "ai_lowsent", null); await putSet(env, "ai_nobal", null);
+    return json(await balanceInfo(env));
   }
   if (p === "/api/settings" && m === "GET") { const icon = await currentIcon(env); return json({ icon, icons: ICONS, bg: ICON_BG[icon] }); }
   if (p === "/api/settings" && m === "POST") {

@@ -24,6 +24,8 @@ input[type=file]{display:none}
 .st{font-size:14px;margin-top:10px;min-height:1.2em;color:var(--muted)}.st.ok{color:var(--ok)}.st.bad{color:var(--bad)}
 .bar{height:6px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:10px;display:none}.bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
 .icons{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.icons button{padding:0;background:none;border:3px solid transparent;border-radius:22%;overflow:hidden;aspect-ratio:1;width:100%}.icons button.on{border-color:var(--gold)}.icons img{width:100%;height:100%;display:block}
+.warnbox{background:#FFF6DD;border:1px solid #F5D27A;border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:10px;color:#5a4300}.warnbox.bad{background:#FFE9E6;border-color:#F2A99E;color:#7a1e12}
+.balrow{display:flex;gap:8px;margin-top:12px}.balrow input{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:1px solid var(--line);font:inherit;font-size:16px;background:transparent;color:inherit}.balrow button{flex:none;width:auto;margin:0;padding:0 20px}
 .kv{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid var(--line)}.kv:last-child{border:0}
 </style>
 </head>
@@ -59,7 +61,7 @@ input[type=file]{display:none}
     <div class="icons" id="icons"></div>
     <div class="st" id="ic-st"></div>
   </div>
-  <div class="card">
+  <div class="card" id="ia">
     <h2>Escaneig amb IA</h2>
     <div id="ai"><p>Carregant…</p></div>
   </div>
@@ -95,7 +97,17 @@ async function counts() {
   try {
     const u = await api("GET", "/api/ai/usage");
     const m = new Date().toISOString().slice(0, 7), row = (u.usage || []).find(x => x.month === m);
-    $("#ai").innerHTML = `<div class="kv"><span>Documents llegits aquest mes</span><b>${row ? row.calls : 0}</b></div><div class="kv"><span>Model</span><b>${u.model}</b></div><p style="margin-top:10px">El cost exacte el pots veure a la consola d'Anthropic (console.anthropic.com).</p>`;
+    const bal = await api("GET", "/api/ai/balance").catch(() => null);
+    const money = v => (Math.round(v * 100) / 100).toLocaleString("ca-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " $";
+    const state = !bal ? "" : bal.empty ? `<div class="warnbox bad">⚠️ <b>La IA s'ha quedat sense saldo.</b> Recarrega'l i després escriu aquí el saldo nou.</div>`
+      : bal.balance === null ? `<div class="warnbox">Escriu el saldo que tens a Anthropic i l'app t'avisarà quan en quedi poc.</div>`
+      : bal.low ? `<div class="warnbox bad">⚠️ <b>Queda poc saldo:</b> uns ${money(Math.max(0, bal.remaining))}.</div>` : "";
+    $("#ai").innerHTML = `${state}
+      ${bal && bal.balance !== null ? `<div class="kv"><span>Saldo que queda (aprox.)</span><b>${money(Math.max(0, bal.remaining))}</b></div><div class="kv"><span>Gastat des de l'última recàrrega</span><b>${money(bal.spent)}</b></div>` : ""}
+      <div class="kv"><span>Documents llegits aquest mes</span><b>${row ? row.calls : 0}</b></div>
+      <div class="balrow"><input id="bal-in" type="text" inputmode="decimal" placeholder="Saldo actual, p. ex. 10"><button id="bal-go">Desar</button></div>
+      <p style="margin-top:8px;font-size:13px">Mira el saldo a <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener">console.anthropic.com</a> (Billing) i escriu-lo aquí cada cop que recarreguis. T'avisaré al mòbil quan en quedin menys de ${bal ? bal.lowAt : 2} $.</p>`;
+    $("#bal-go").onclick = async () => { const v = $("#bal-in").value.trim(); if (!v) return; $("#bal-go").disabled = true; try { await api("POST", "/api/ai/balance", { balance: v }); await counts(); } catch { alert("No s'ha pogut desar"); } finally { const b = $("#bal-go"); if (b) b.disabled = false; } };
   } catch { $("#ai").innerHTML = "<p>—</p>"; }
 }
 

@@ -131,6 +131,7 @@
       res = await fetch("/api/ai", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body, signal: opts.signal });
     } catch (e) { if (opts.signal && opts.signal.aborted) throw err("cancelled"); throw err("upstream_error"); }
     if (res.status === 401) { location.reload(); throw err("unauthenticated"); }
+    if (res.status === 402) window.dispatchEvent(new Event("ai-nobal"));
     const data = await res.json().catch(() => null);
     if (!res.ok) throw err((data && data.error && data.error.code) || "upstream_error", data && data.error && data.error.message);
     if (opts.onText) { try { opts.onText({ text: data.text, delta: data.text }); } catch {} }
