@@ -775,6 +775,13 @@ canvas.fw{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z
 .slist.fact li{display:flex;justify-content:space-between;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line)}
 .slist.fact li.tot{font-weight:800;border-bottom:0;border-top:2px solid var(--ink)}
 .spin{animation:spin 1.6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
+.spk-ln{position:absolute;width:1.5px;margin-left:-.75px;background:var(--muted);opacity:0;pointer-events:none;transition:opacity .15s}
+.spk-ln.on{opacity:.55}
+.spk-tip{position:absolute;z-index:5;display:grid;gap:1px;padding:6px 10px;border-radius:10px;background:#0B1430;color:#fff;border:1px solid rgb(255 255 255 / .12);font-size:.74rem;line-height:1.3;white-space:nowrap;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s;box-shadow:0 8px 20px -8px rgb(0 0 0 / .5)}
+.spk-tip.on{opacity:1;transform:none}
+.spk-tip b{font-size:.78rem;text-transform:capitalize}
+.spk-tip .ti{color:color-mix(in srgb,var(--in) 55%,#fff)}.spk-tip .to{color:color-mix(in srgb,var(--out) 45%,#fff)}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1352,6 +1359,35 @@ function spark(a,c,id,W=160,H=46,b){
   let o=""; if(b&&b.some(v=>v>0)){ const q=P(b), e=q[q.length-1]; o=`<path d="${curve(q)}" fill="none" stroke="var(--out)" stroke-width="1.8" stroke-dasharray="4 3" stroke-linecap="round" vector-effect="non-scaling-stroke" opacity=".9"/><path d="M${e[0].toFixed(1)} ${e[1].toFixed(1)}h0" stroke="var(--out)" stroke-width="5.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   return `<svg class="spk" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px" aria-hidden="true">${o}<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity=".45"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${l[0].toFixed(1)} ${H} L${pts[0][0]} ${H}Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${c}" stroke-width="5" stroke-opacity=".22" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="${d}" fill="none" stroke="${c}" stroke-width="2.2" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M${l[0].toFixed(1)} ${l[1].toFixed(1)}h0" stroke="${c}" stroke-width="10" stroke-linecap="round" vector-effect="non-scaling-stroke"/><path d="M${l[0].toFixed(1)} ${l[1].toFixed(1)}h0" stroke="var(--surface)" stroke-width="4.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
 }
+/* ---------- Passar el dit per la línia: mostra el mes ---------- */
+const spkData = (f, svg) => svg.replace('<svg class="spk"', `<svg class="spk" data-a="${f.a.map(v=>Math.round(v*100)/100).join(",")}" data-b="${(f.b||[]).map(v=>Math.round(v*100)/100).join(",")}" data-s="${f.months[0]}"`);
+(function(){
+  let cur=null, moved=false, sx=0, hideT=0;
+  function box(svg){ const host=svg.parentElement; let tip=host.querySelector(".spk-tip"), ln=host.querySelector(".spk-ln");
+    if(!tip){ if(getComputedStyle(host).position==="static") host.style.position="relative"; tip=document.createElement("div"); tip.className="spk-tip"; ln=document.createElement("div"); ln.className="spk-ln"; host.append(ln,tip); }
+    return {host,tip,ln}; }
+  function show(svg, clientX){
+    const a=svg.dataset.a.split(",").map(Number), b=svg.dataset.b?svg.dataset.b.split(",").map(Number):[], n=a.length; if(!n) return;
+    const r=svg.getBoundingClientRect(), vb=svg.viewBox.baseVal, pad=4*r.width/vb.width;
+    const f=Math.max(0,Math.min(1,(clientX-r.left-pad)/(r.width-2*pad))), i=Math.round(f*(n-1)), mo=addMonths(svg.dataset.s,i);
+    const {host,tip,ln}=box(svg), hr=host.getBoundingClientRect(), x=r.left-hr.left+pad+(r.width-2*pad)*i/(n-1);
+    ln.style.cssText=`left:${x}px;top:${r.top-hr.top}px;height:${r.height}px`;
+    tip.innerHTML=`<b>${monthName(mo)} ${mo.slice(0,4)}</b><span class="ti">Cobrat ${eur0(a[i])}</span>${b.length&&b[i]>0?`<span class="to">Despeses ${eur0(b[i])}</span>`:""}`;
+    tip.classList.add("on"); ln.classList.add("on");
+    const tw=tip.offsetWidth; tip.style.left=Math.max(4,Math.min(hr.width-tw-4,x-tw/2))+"px"; tip.style.top=Math.max(4,r.top-hr.top-tip.offsetHeight-6)+"px";
+    clearTimeout(hideT);
+  }
+  function hide(svg,delay){ clearTimeout(hideT); hideT=setTimeout(()=>{ const h=svg&&svg.parentElement; if(h) h.querySelectorAll(".spk-tip,.spk-ln").forEach(e=>e.classList.remove("on")); }, delay); }
+  document.addEventListener("pointerdown", e=>{ const s=e.target.closest&&e.target.closest("svg.spk[data-a]"); if(!s) return; cur=s; moved=false; sx=e.clientX; show(s,e.clientX); });
+  document.addEventListener("pointermove", e=>{ const s=e.target.closest&&e.target.closest("svg.spk[data-a]");
+    if(cur){ if(Math.abs(e.clientX-sx)>6) moved=true; show(cur,e.clientX); return; }
+    if(s && e.pointerType==="mouse") show(s,e.clientX); });
+  document.addEventListener("pointerup", ()=>{ if(cur){ hide(cur, 1800); cur=null; } });
+  document.addEventListener("pointercancel", ()=>{ if(cur){ hide(cur, 0); cur=null; } });
+  document.addEventListener("pointerout", e=>{ const s=e.target.closest&&e.target.closest("svg.spk[data-a]"); if(s && e.pointerType==="mouse" && !cur && !s.contains(e.relatedTarget)) hide(s, 150); });
+  // Si has arrossegat el dit per la línia, no obris el pis.
+  document.addEventListener("click", e=>{ if(moved && e.target.closest&&e.target.closest("svg.spk[data-a]")){ e.stopPropagation(); e.preventDefault(); moved=false; } }, true);
+})();
 const trendTag = t => t===null ? "" : `<b class="${t>=0?"tup":"tdn"}" title="Últims 3 mesos comparats amb els 3 d'abans">${t>=0?"▲":"▼"} ${Math.abs(t)}%</b>`;
 
 function flowCard(vm){
@@ -1370,7 +1406,7 @@ function flatTiles(){
   const ps=sortedProps(); if(!ps.length) return `<p class="muted">Encara no hi ha pisos.</p>`;
   let end="", start="";
   const tiles=ps.map((p,k)=>{ const f=flatSeries(p), c=flatCol(p), cs=current(p.id), r=cs.length?sum(cs,x=>split(x,curMonth()).net):0; end=f.end; start=f.months[0];
-    return `<button type="button" class="ftile" style="--c:${c}" data-act="openProp" data-id="${p.id}"><span class="fth"><span class="ftav">${visual(p)}</span><span class="ftn"><b>${esc(shortProp(p.name))}</b><small>${r?eur0(r)+"/mes":"Sense contracte"}</small></span></span><span class="ftv num">${eur0(f.tot)}</span><span class="ftt">${trendTag(f.t)}${f.out>=1?`<span class="ftout">−${eur0(f.out)}</span>`:""}</span>${spark(f.a,c,"tsk"+k,160,46,f.b)}</button>`; }).join("");
+    return `<button type="button" class="ftile" style="--c:${c}" data-act="openProp" data-id="${p.id}"><span class="fth"><span class="ftav">${visual(p)}</span><span class="ftn"><b>${esc(shortProp(p.name))}</b><small>${r?eur0(r)+"/mes":"Sense contracte"}</small></span></span><span class="ftv num">${eur0(f.tot)}</span><span class="ftt">${trendTag(f.t)}${f.out>=1?`<span class="ftout">−${eur0(f.out)}</span>`:""}</span>${spkData(f,spark(f.a,c,"tsk"+k,160,46,f.b))}</button>`; }).join("");
   return `<div class="ftiles">${tiles}</div>`;
 }
 function emptyStart(){
@@ -1394,7 +1430,7 @@ function viewProps(){
       <div class="addr">${esc(p.address||"Sense adreça")}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${cs.length?`<span class="chip ok" title="${esc(cs.map(c=>c.tenantName).join(" / "))}">${cs.length===1?esc(shortName(cs[0].tenantName)||"Llogat"):cs.length+" contractes vigents"}</span>${unpaid?`<span class="chip warn">${monthName(m)} pendent</span>`:`<span class="chip ok">${monthName(m)} cobrat</span>`}`:`<span class="chip">${p.vacant?"Sense llogar":"Sense contracte vigent"}</span>`}</div>
       ${(()=>{ const c=completeness(p); return c.pct<100?`<div class="pcomp"><span>Fitxa ${c.pct}%</span><div class="bar"><i style="width:${c.pct}%"></i></div></div>`:""; })()}
-      ${cs.length?(()=>{ const y=today().slice(0,4), g=earned(p,y); const fs=flatSeries(p); return `<div class="foot fa"><div class="pspk"><div class="psh"><small>Cobrat els últims 12 mesos</small><span><b class="num">${eur0(fs.tot)}</b>${trendTag(fs.t)}</span></div>${spark(fs.a,flatCol(p),"psk"+p.id,300,56,fs.b)}<div class="plg"><span><i style="background:${flatCol(p)}"></i>Cobrat</span><span><i class="dsh"></i>Despeses i hipoteca ${eur0(fs.out)}</span></div></div><div class="fah"><div title="Ingressos del ${y} menys les despeses i els interessos de la hipoteca del ${y} (sense comptar millores ni despeses de compra)"><small>Guany ${y}</small><span class="num fbig ${g>=0?"pos":"neg"}">${eur(g)}</span></div><div class="far"><small>${isEmp(p)?"Ingrés mitjà":"Renda"}</small><span class="num">${eur(k.rentM)}<span class="small muted">/mes</span></span></div></div><div class="fap"><span><small>Rendibilitat Bruta</small><b class="num">${pct(k.gross)}</b></span><span><small>Rendibilitat Neta</small><b class="num">${pct(k.net)}</b></span></div></div>`; })():`<div class="foot nofoot"><span class="muted">${isEmp(p)?"Afegeix l'empresa que el té llogat i l'import mensual per veure'n la renda i la rendibilitat.":p.vacant?"Sense llogar ara mateix.":"Afegeix el contracte per veure'n la renda i la rendibilitat."}</span></div>`}
+      ${cs.length?(()=>{ const y=today().slice(0,4), g=earned(p,y); const fs=flatSeries(p); return `<div class="foot fa"><div class="pspk"><div class="psh"><small>Cobrat els últims 12 mesos</small><span><b class="num">${eur0(fs.tot)}</b>${trendTag(fs.t)}</span></div>${spkData(fs,spark(fs.a,flatCol(p),"psk"+p.id,300,56,fs.b))}<div class="plg"><span><i style="background:${flatCol(p)}"></i>Cobrat</span><span><i class="dsh"></i>Despeses i hipoteca ${eur0(fs.out)}</span></div></div><div class="fah"><div title="Ingressos del ${y} menys les despeses i els interessos de la hipoteca del ${y} (sense comptar millores ni despeses de compra)"><small>Guany ${y}</small><span class="num fbig ${g>=0?"pos":"neg"}">${eur(g)}</span></div><div class="far"><small>${isEmp(p)?"Ingrés mitjà":"Renda"}</small><span class="num">${eur(k.rentM)}<span class="small muted">/mes</span></span></div></div><div class="fap"><span><small>Rendibilitat Bruta</small><b class="num">${pct(k.gross)}</b></span><span><small>Rendibilitat Neta</small><b class="num">${pct(k.net)}</b></span></div></div>`; })():`<div class="foot nofoot"><span class="muted">${isEmp(p)?"Afegeix l'empresa que el té llogat i l'import mensual per veure'n la renda i la rendibilitat.":p.vacant?"Sense llogar ara mateix.":"Afegeix el contracte per veure'n la renda i la rendibilitat."}</span></div>`}
       </span>
     </button>`; }).join("")}</div></section>`;
 }
