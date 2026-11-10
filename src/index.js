@@ -380,7 +380,7 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => { await ensureSchema(env); await dailyReminder(env); })());
   },
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     if (!env.APP_PASSWORD || !env.SESSION_SECRET) return html("<h1>Falta configurar</h1><p>Cal posar els secrets APP_PASSWORD i SESSION_SECRET a Cloudflare.</p>", 500);
@@ -405,6 +405,36 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD") {
         const origin = request.headers.get("origin");
         if (origin && origin !== url.origin) return err("forbidden", 403);
+      }
+      // Descàrregues grans (paquet del gestor): es pugen a trossos i es baixen com una descàrrega normal del navegador.
+      if (p === "/api/dl/part" && request.method === "POST") {
+        const id = url.searchParams.get("id"), n = Number(url.searchParams.get("n"));
+        const len = Number(request.headers.get("content-length") || 0);
+        if (!validId(id) || !(n >= 0 && n < 50) || !len || len > 24 * 1024 * 1024) return err("invalid_request", 400);
+        await env.BLOBS.put(`t:${id}:${n}`, request.body, { expirationTtl: 86400 });
+        return json({ ok: true });
+      }
+      if (p === "/api/dl/done" && request.method === "POST") {
+        const b = await request.json().catch(() => ({}));
+        if (!validId(b.id) || !(b.parts > 0 && b.parts <= 50)) return err("invalid_request", 400);
+        const name = String(b.name || "fitxer").replace(/[\\/:*?"<>|\r\n]+/g, "_").slice(0, 120);
+        await env.BLOBS.put(`t:${b.id}`, JSON.stringify({ parts: b.parts, name, type: String(b.type || "application/octet-stream").slice(0, 100), size: Number(b.size) || 0 }), { expirationTtl: 86400 });
+        return json({ url: "/dl/" + b.id + "/" + encodeURIComponent(name) });
+      }
+      if (p.startsWith("/dl/")) {
+        const id = p.split("/")[2];
+        if (!validId(id)) return err("not_found", 404);
+        const meta = await env.BLOBS.get(`t:${id}`, { type: "json" });
+        if (!meta) return html("<p style='font-family:sans-serif;padding:24px'>Aquest fitxer ja no està disponible. Torna'l a generar des de l'app.</p>");
+        const { readable, writable } = new TransformStream();
+        const pump = (async () => {
+          for (let i = 0; i < meta.parts; i++) { const v = await env.BLOBS.get(`t:${id}:${i}`, { type: "stream" }); if (!v) break; await v.pipeTo(writable, { preventClose: true }); }
+          await writable.close();
+        })().catch(e => writable.abort(e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(pump);
+        const h = { "content-type": meta.type, "content-disposition": `attachment; filename="${meta.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(meta.name)}`, "cache-control": "no-store" };
+        if (meta.size) h["content-length"] = String(meta.size);
+        return new Response(readable, { headers: h });
       }
       if (p.startsWith("/_blob/")) {
         const id = decodeURIComponent(p.slice(7));

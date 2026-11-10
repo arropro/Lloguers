@@ -1688,23 +1688,31 @@ async function gestorBuild(y, pids){
     else {
       // Al mòbil no el descarreguem sol: Android l'obria amb una altra app (Claude). Tries tu què fer-ne.
       GESTOR_FILE={blob, fname, xlsx:new Blob([XL.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), y};
-      const zf=new File([blob],fname,{type:"application/zip"}), canZip=!!(navigator.canShare&&navigator.canShare({files:[zf]}));
-      st(`<b>Llest:</b> ${msg}<div class="gact"><button type="button" class="btn primary" data-act="gestorSave">⬇️ Desar al mòbil</button>${canZip?`<button type="button" class="btn" data-act="gestorShare">📤 Enviar…</button>`:""}<button type="button" class="btn" data-act="gestorXlsx">📊 Només l'Excel</button></div><p class="small muted" style="margin-top:8px">Es desa a la carpeta Baixades del mòbil.</p>`);
+      st(`<b>Llest:</b> ${msg}<div class="gact"><button type="button" class="btn primary" data-act="gestorSave">⬇️ Desar al mòbil</button><button type="button" class="btn" data-act="gestorXlsx">📊 Només l'Excel</button></div><p class="small muted" style="margin-top:8px">Es desa a la carpeta Baixades del mòbil.</p>`);
     }
   }catch(e){ if(e&&(e.code==="declined"||e.code==="cancelled")) st("Descàrrega cancel·lada."); else st("No s'ha pogut preparar el paquet. Torna-ho a provar.", true); }
   if(btn) btn.disabled=false;
 }
 
 let GESTOR_FILE=null;
-async function gestorSave(which){
-  const G=GESTOR_FILE; if(!G) return;
+// Al mòbil, el fitxer es puja al teu servidor i es baixa com qualsevol descàrrega del navegador
+// (les descàrregues fetes des de l'app mateixa Android les passava a una altra app).
+async function serverDownload(blob, name, type, btn){
+  const id=[...crypto.getRandomValues(new Uint8Array(12))].map(b=>b.toString(16).padStart(2,"0")).join(""), CH=20*1024*1024, parts=Math.max(1,Math.ceil(blob.size/CH));
+  const lbl=btn&&btn.innerHTML;
   try{
-    if(which==="share"){ await navigator.share({files:[new File([G.blob],G.fname,{type:"application/zip"})], title:G.fname}); return; }
-    if(which==="xlsx"){ const f=new File([G.xlsx],`Resum ${G.y}.xlsx`,{type:G.xlsx.type});
-      if(navigator.canShare&&navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:f.name}); return; }
-      await downloadsCap.save({filename:f.name, data:new Blob([G.xlsx],{type:"application/octet-stream"})}); toast("Excel desat a Baixades"); return; }
-    await downloadsCap.save({filename:G.fname, data:G.blob}); toast("Desat a Baixades");
-  }catch(e){ if(e&&e.name!=="AbortError") toast("No s'ha pogut fer. Torna-ho a provar."); }
+    for(let i=0;i<parts;i++){ if(btn) btn.innerHTML=`Preparant… ${Math.round(i/parts*100)}%`;
+      const r=await fetch(`/api/dl/part?id=${id}&n=${i}`,{method:"POST",credentials:"same-origin",body:blob.slice(i*CH,(i+1)*CH)}); if(!r.ok) throw new Error("part"); }
+    const d=await (await fetch("/api/dl/done",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({id,parts,name,type,size:blob.size})})).json();
+    location.assign(d.url);
+    toast("Descarregant… el trobaràs a Baixades");
+  }catch{ toast("No s'ha pogut preparar la descàrrega. Torna-ho a provar."); }
+  finally{ if(btn) btn.innerHTML=lbl; }
+}
+async function gestorSave(which, btn){
+  const G=GESTOR_FILE; if(!G) return;
+  if(which==="xlsx") return serverDownload(G.xlsx, `Resum ${G.y}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", btn);
+  return serverDownload(G.blob, G.fname, "application/zip", btn);
 }
 /* ---------- companies timeline (rental to companies) ---------- */
 const EMPCOL=["#2F5BEA","#E0A526","#1F9D6B","#B05FD8","#E0573A","#2BA3B8"];
@@ -3543,7 +3551,7 @@ const ACT = {
       <div class="actions"><button class="btn primary">Desar</button></div></form>`);
     $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
       await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
-  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSave: () => gestorSave("save"), gestorShare: () => gestorSave("share"), gestorXlsx: () => gestorSave("xlsx"), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSave: (id,b) => gestorSave("save",b), gestorXlsx: (id,b) => gestorSave("xlsx",b), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
   chkNotDup: async id => { try{ await db.doc("moves/"+id).update({notDup:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkPeriod: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; try{ await db.doc("moves/"+id).update({period:ymOf(x.date)}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkLink: async key => { const [id,cid]=key.split("|"); try{ await db.doc("moves/"+id).update({contractId:cid}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
