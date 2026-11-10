@@ -790,6 +790,9 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
 .funpay{font:inherit;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:transparent;color:var(--muted)}
 .funpay:hover{color:var(--ink);border-color:var(--muted)}
+.invl{list-style:none;margin:12px 0 0;padding:0}
+.invl li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.invl li > span{flex:1;min-width:0}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -861,7 +864,7 @@ const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/
 
 const CATS = {
   despesa: ["Subministraments","Comunitat","IBI i taxes","Assegurança","Derrama","Reparació i manteniment","Gestoria i honoraris","Comissió plataforma","Mobiliari i millores","Despeses de compra","Altres despeses"],
-  ingres: ["Lloguer","Fiança","Altres ingressos"]
+  ingres: ["Lloguer","Fiança","Subministraments refacturats","Altres ingressos"]
 };
 const INVEST = ["Mobiliari i millores","Despeses de compra","Derrama"];
 const PTYPES = ["Pis","Casa","Local","Altres"];
@@ -1550,7 +1553,7 @@ function tabResum(p){
   const years=[...new Set([today().slice(0,4), ...movesOf(p.id).map(x=>String(x.date).slice(0,4))])].sort().reverse();
   const vig=k.cur, ren=nextRenew(p.policyRenewal), renDays=ren?daysBetween(today(),ren):null;
   const hasIns = p.insurer||p.policyNumber||p.insurerPhone||p.policyRenewal;
-  return `${completePanel(p)}${isEmp(p)?empPanel(p):""}<section class="panel">
+  return `${completePanel(p)}${isEmp(p)?empPanel(p)+invPanel(p):""}<section class="panel">
     <div class="kv">
       <div><span class="label">${isEmp(p)?"Ingrés mitjà mensual":"Renda mensual"}</span><span class="num big">${eur(k.rentM)}</span><span class="small muted">${isEmp(p)?"cobrat els últims 12 mesos (amb repercussions)":vig.length?"el que reps cada mes":"sense contracte vigent"}</span></div>
       <div><span class="label">Flux de caixa mensual</span><span class="num big ${k.cashM>=0?"pos":"neg"}">${eur(k.cashM)}</span><span class="small muted">renda − despeses${M?" − quota":""}</span></div>
@@ -1724,6 +1727,115 @@ async function uploadLink(blob, name, type, btn){
 }
 /* ---------- companies timeline (rental to companies) ---------- */
 const EMPCOL=["#2F5BEA","#E0A526","#1F9D6B","#B05FD8","#E0573A","#2BA3B8"];
+/* ================= Factures de llum i aigua (pisos per a empreses) ================= */
+const INV_CAT="Subministraments refacturats";
+const dmy = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; };
+const eurInv = v => (Math.round(v*100)/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2});
+function invList(p){ return movesOf(p.id).filter(x=>x.category===INV_CAT).sort((a,b)=>String(b.date).localeCompare(a.date)); }
+function invPanel(p){
+  const L=invList(p).slice(0,4);
+  return `<section class="panel"><div class="panel-h"><h2>Factures de llum i aigua</h2></div>
+    <button type="button" class="btn primary" data-act="invForm" data-id="${p.id}" style="width:100%;justify-content:center;padding:13px">🧾 Fer factura de llum o aigua</button>
+    ${L.length?`<ul class="invl">${L.map(x=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span></span><b class="num">${eur(x.amount)}</b>${x.docId?`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">Enviar</button>`:""}</li>`).join("")}</ul>`:`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`}
+  </section>`;
+}
+function invForm(pid){
+  const p=propById(pid); if(!p) return; const I=p.inv||{}, c=current(pid)[0];
+  if(!c){ toast("Aquest pis no té cap empresa amb el lloguer vigent"); return; }
+  const td=today(), first=td.slice(0,8)+"01";
+  openSheet("Factura de llum o aigua", `<form class="form" id="f-inv">
+    <div class="seg3" role="radiogroup" aria-label="Tipus"><label><input type="radio" name="kind" value="Luz" checked>💡 Llum</label><label><input type="radio" name="kind" value="AGUA">💧 Aigua</label></div>
+    ${field("Import (€)", amtIn("i-amt","amt","","266,09"))}
+    <div class="row2">${field("Període: des del", `<input type="date" name="from" value="${esc(I.lastTo||first)}" required>`)}${field("fins al", `<input type="date" name="to" value="${esc(td)}" required>`)}</div>
+    <div class="row2">${field("Número de factura", `<input name="no" inputmode="numeric" value="${esc(I.next||"")}" placeholder="p. ex. 22" required>`)}${field("Data de la factura", `<input type="date" name="date" value="${td}" required>`)}</div>
+    <p class="small muted">Per a: <b>${esc(c.tenantName||"")}</b>${c.cif?` · ${esc(c.cif)}`:""}</p>
+    <details class="fold" ${(!c.tenantAddress||!I.emName)?"open":""}><summary>Dades de la factura ${(!c.tenantAddress||!I.emName)?"(omple-les el primer cop)":""}</summary>
+      ${field("Adreça de l'empresa", `<input name="caddr" value="${esc(c.tenantAddress||"")}" placeholder="España - Barcelona - Rambla Catalunya 73">`)}
+      ${field("Adreça del pis (línia 1)", `<input name="pl1" value="${esc(I.pl1||"Inmueble sito en España - Catalunya - Tarragona")}">`)}
+      ${field("Adreça del pis (línia 2)", `<input name="pl2" value="${esc(I.pl2||"")}" placeholder="43001 Carrer de Lleida, 23 1o 2a">`)}
+      ${field("El teu nom", `<input name="emName" value="${esc(I.emName||"")}" placeholder="Nom i cognoms">`)}
+      ${field("El teu NIF", `<input name="emNif" value="${esc(I.emNif||"")}">`)}
+      ${field("La teva adreça", `<input name="emAddr" value="${esc(I.emAddr||"")}" placeholder="Carrer…, CP Ciutat">`)}
+    </details>
+    <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Cancel·lar</button><button class="btn primary" id="i-go">Fer la factura</button></div></form>`);
+  $("#f-inv").addEventListener("submit", async e=>{ e.preventDefault(); const f=e.target, g=n=>String(f.elements[n].value||"").trim();
+    const amt=parseAmt(g("amt")); if(!(amt>0)){ toast("Posa l'import"); return; }
+    if(!g("emName")||!g("emNif")||!g("caddr")||!g("pl2")){ f.querySelector("details").open=true; toast("Omple les dades de la factura"); return; }
+    const b=$("#i-go"); b.disabled=true; b.textContent="Fent la factura…";
+    const d={kind:f.elements.kind.value, amt, from:g("from"), to:g("to"), no:g("no"), date:g("date"), cname:c.tenantName||"", cif:c.cif||"", caddr:g("caddr"), pl1:g("pl1"), pl2:g("pl2"), emName:g("emName"), emNif:g("emNif"), emAddr:g("emAddr")};
+    try{
+      const blob=await invPdf(d);
+      const r=await assets.upload(blob,{type:"application/pdf"});
+      const kindCa=d.kind==="Luz"?"Llum":"Aigua", fname=`Factura ${d.no} ${kindCa} ${d.cname}.pdf`;
+      const ref=await db.collection("moves").add({type:"ingres", category:INV_CAT, amount:amt, date:d.date, period:ymOf(d.date), propId:pid, contractId:c.id, concept:`Factura ${d.no} · ${kindCa} ${dmy(d.from)}–${dmy(d.to)}`, provider:d.cname, docId:r.id, docMime:"application/pdf", docName:fname, invNo:d.no, invKind:kindCa, vat:0, source:"manual", createdAt:Date.now()});
+      const nn=/^\d+$/.test(d.no)?String(+d.no+1):"";
+      await db.doc("props/"+pid).update({inv:{...I, next:nn, pl1:d.pl1, pl2:d.pl2, emName:d.emName, emNif:d.emNif, emAddr:d.emAddr, lastTo:d.to}});
+      if(d.caddr!==(c.tenantAddress||"")) await db.doc("contracts/"+c.id).update({tenantAddress:d.caddr});
+      INV_LAST={blob, fname, docId:r.id};
+      openSheet("Factura feta ✓", `<div class="form"><p>Factura <b>${esc(d.no)}</b> de ${kindCa.toLowerCase()} per a ${esc(d.cname)}: <b>${eur(amt)}</b>. Ja és als documents del pis i compta com a ingrés.</p>
+        <div class="gact col"><button type="button" class="btn primary" data-act="invSendLast">📤 Enviar la factura</button><a class="btn" href="/_blob/${esc(r.id)}" target="_blank" rel="noopener">👁 Veure-la</a></div>
+        <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Tancar</button></div></div>`);
+    }catch(e){ console.warn(e); toast("No s'ha pogut fer la factura. Torna-ho a provar."); b.disabled=false; b.textContent="Fer la factura"; }
+  });
+}
+let INV_LAST=null;
+async function invShare(blob, fname){
+  const file=new File([blob], fname, {type:"application/pdf"});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:fname}); }catch{} return; }
+  const url=await uploadLink(blob, fname, "application/pdf");
+  if(!url) return;
+  if(navigator.share){ try{ await navigator.share({title:fname, url}); }catch{} return; }
+  await downloadsCap.save({filename:fname, data:blob});
+}
+async function invSendMove(id){ const x=S.moves.find(m=>m.id===id); if(!x||!x.docId) return;
+  try{ const blob=await (await fetch("/_blob/"+x.docId,{credentials:"same-origin"})).blob(); await invShare(blob, x.docName||"Factura.pdf"); }catch{ toast("No s'ha pogut obrir la factura."); } }
+// PDF senzill fet a mà (sense llibreries): text Helvetica, línies i colors. Així funciona sempre, fins i tot sense internet.
+const HW={n:"278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 556 556 333 500 278 556 500 722 500 500 500 334 260 334 584",
+  b:"278 333 474 556 556 889 722 238 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 333 333 584 584 584 611 975 722 722 722 722 667 611 778 722 278 556 722 611 833 722 778 667 778 722 667 611 722 667 944 667 667 611 333 278 333 584 556 333 556 611 556 611 556 333 611 611 278 278 556 278 889 611 611 611 611 389 556 333 611 556 778 556 556 500 389 280 389 584"};
+const HWA={n:HW.n.split(" ").map(Number), b:HW.b.split(" ").map(Number)};
+function pdfW(t, bold, size){ const A=bold?HWA.b:HWA.n; let w=0; for(const ch of String(t)){ let c=ch==="€"?36:(ch.normalize("NFD")[0]||"?").charCodeAt(0); if(c<32||c>126) c=63; w+=A[c-32]; } return w*size/1000; }
+function pdfTxt(t){ let o=""; for(const ch of String(t)){ let c=ch==="€"?0x80:ch.charCodeAt(0); if(c!==0x80&&(c>255||(c>126&&c<160))) c=63; const s=String.fromCharCode(c); o+= s==="("||s===")"||s==="\\" ? "\\"+s : s; } return o; }
+function miniPdf(draw){
+  const ops=[]; let font="F1", size=10;
+  const api={
+    font(bold,sz){ font=bold?"F2":"F1"; size=sz; this.bold=!!bold; },
+    color(r,g,b){ ops.push(`${(r/255).toFixed(3)} ${(g/255).toFixed(3)} ${(b/255).toFixed(3)} rg`); },
+    text(t,x,y,align){ const w=align==="right"?pdfW(t,font==="F2",size):0; ops.push(`BT /${font} ${size} Tf ${(x-w).toFixed(2)} ${(842-y).toFixed(2)} Td (${pdfTxt(t)}) Tj ET`); },
+    line(x1,y1,x2,y2,w=.8){ ops.push(`0 0 0 RG ${w} w ${x1} ${842-y1} m ${x2} ${842-y2} l S`); },
+  };
+  draw(api);
+  const stream=ops.join("\n");
+  const objs=["<< /Type /Catalog /Pages 2 0 R >>","<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`];
+  let out="%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"; const off=[];
+  objs.forEach((o,i)=>{ off.push(out.length); out+=`${i+1} 0 obj\n${o}\nendobj\n`; });
+  const xref=out.length;
+  out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+off.map(n=>String(n).padStart(10,"0")+" 00000 n \n").join("")+`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const u=new Uint8Array(out.length); for(let i=0;i<out.length;i++) u[i]=out.charCodeAt(i)&255;
+  return new Blob([u],{type:"application/pdf"});
+}
+async function invPdf(d){
+  const G=[106,168,79];
+  return miniPdf(P=>{
+    P.color(0,0,0);
+    P.font(true,11); P.text(d.cname, 488, 102, "right");
+    P.font(false,10.5); P.text(d.caddr, 498, 117, "right");
+    P.font(false,8.5); P.text(d.cif, 494, 130, "right");
+    P.font(false,9.5); P.text("Fra", 140, 229, "right"); P.text("Fecha Fra:", 150, 243, "right"); P.text("Periodo:", 150, 257, "right");
+    P.font(true,9.5); P.text(d.no, 210, 229);
+    P.font(false,9.5); P.text(dmy(d.date).replace(/\/(\d\d)(\d\d)$/,"/$2"), 162, 243); P.text(dmy(d.from), 162, 257); P.text(dmy(d.to), 222, 257);
+    P.font(false,9); P.color(...G); P.text("Concepto", 104, 304); P.text("B. Imponible", 318, 304); P.text("Impuesto", 376, 304); P.text("Total impuesto", 422, 304); P.text("TOTAL", 489, 304);
+    P.line(102,309,532,309);
+    P.color(0,0,0); P.text(`Suministro ${d.kind}`, 104, 330); P.text(eurInv(d.amt), 368, 330, "right"); P.text("exento", 376, 330); P.text("0", 472, 330, "right"); P.text(eurInv(d.amt), 530, 330, "right");
+    P.text(d.pl1, 104, 343); P.text(d.pl2, 104, 356);
+    P.line(102,371,532,371);
+    P.font(true,9); P.text("TOTAL", 296, 403, "right"); P.font(false,9); P.text(eurInv(d.amt), 368, 403, "right"); P.font(true,9.5); P.text(eurInv(d.amt)+"  €", 530, 403, "right");
+    P.font(false,9); P.color(...G); P.text(String(d.emName).toUpperCase(), 320, 582); P.color(0,0,0); P.text(d.emNif, 320, 595); P.text(d.emAddr, 320, 608);
+  });
+}
 function empPanel(p){
   const cy=+today().slice(0,4), y=S.ey||cy, Y=String(y), a=Y+"-01-01", z=Y+"-12-31";
   const cs=contractsOf(p.id).filter(c=>c.start&&c.start<=z&&(!c.end||c.end>=a)).sort((q,w)=>q.start.localeCompare(w.start));
@@ -3571,6 +3683,9 @@ const ACT = {
     openSheet("Separar la fiança", `<div class="form"><p class="muted">${fmtDate(x.date)} · cobrament de ${eur(x.amount)}. Quina part era la fiança?</p><label class="field"><span>Import de la fiança</span><input id="chk-f" type="text" inputmode="decimal" value="${String(sug).replace(".",",")}"></label><p class="small muted">${dep?`Al contracte hi consta una fiança de ${eur(dep)}. `:""}Es restarà del lloguer i quedarà anotada com a fiança, que no compta com a ingrés.</p><div class="actions"><button type="button" class="btn ghost" data-act="checkData">Enrere</button><button type="button" class="btn primary" data-act="chkFianGo" data-id="${id}">Separar</button></div></div>`); },
   chkFianGo: id => chkFianGo(id),
   chkRead: ids => chkRead(ids),
+  invForm: id => invForm(id),
+  invSendLast: () => { if(INV_LAST) invShare(INV_LAST.blob, INV_LAST.fname); },
+  invSend: id => invSendMove(id),
   quickUnpaidProp: async pid => { const m=curMonth(); const ms=current(pid).flatMap(c=>rentMoves(c,m)); if(!ms.length) return;
     const saved=ms.map(x=>{ const {id,...d}=x; return d; });
     try{ for(const x of ms) await db.doc("moves/"+x.id).delete();
