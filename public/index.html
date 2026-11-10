@@ -1623,7 +1623,7 @@ function gestorForm(auto){
     <div class="field"><span>Pisos</span><div class="form" style="gap:6px">${ps.map(p=>{ const on=!!(p.purchaseDate||contractsOf(p.id).length); return `<label class="chk"><input type="checkbox" name="p" value="${p.id}" ${on?"checked":""}> ${esc(p.name)}</label>`; }).join("")}</div></div>
     <p class="small muted">Prepararé un fitxer ZIP amb un Excel (resum per pis, tots els moviments, contractes i el que falta) i una carpeta per pis amb les factures i rebuts de l'any, els contractes, l'escriptura i els documents de la hipoteca.</p>
     <div id="g-st" class="note" hidden></div>
-    <div class="actions"><button class="btn primary" id="g-go">Generar l'Excel</button></div></form>`);
+    <div class="actions"><button class="btn primary" id="g-go">Preparar el paquet</button></div></form>`);
   $("#f-gest").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target); const y=+fd.get("year"), pids=fd.getAll("p"); if(!pids.length){ toast("Tria almenys un pis."); return; } await gestorBuild(y, pids); };
   if(auto) $("#f-gest").requestSubmit();
 }
@@ -1688,8 +1688,11 @@ async function gestorBuild(y, pids){
     if(!mobile){ await downloadsCap.save({filename:fname, data:blob}); st(`Fet: ${msg}`); }
     else {
       // Al mòbil no el descarreguem sol: Android l'obria amb una altra app (Claude). Tries tu què fer-ne.
-      GESTOR_FILE={blob, fname, xlsx:new Blob([XL.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), y};
-      st(`<b>Llest:</b> ${msg}<div class="gact"><button type="button" class="btn primary" data-act="gestorSave">⬇️ Desar al mòbil</button><button type="button" class="btn" data-act="gestorXlsx">📊 Només l'Excel</button></div><p class="small muted" style="margin-top:8px">Es desa a la carpeta Baixades del mòbil.</p>`);
+      GESTOR_FILE={blob, fname, y};
+      st(`<span class="thinking"><span class="dot"></span>Preparant l'enllaç per enviar…</span>`);
+      GESTOR_LINK=await uploadLink(blob, fname, "application/zip");
+      if(!GESTOR_LINK){ st("No s'ha pogut preparar. Torna-ho a provar.", true); if(btn) btn.disabled=false; return; }
+      st(`<b>Llest:</b> ${msg}<div class="gact col"><button type="button" class="btn primary" data-act="gestorSend">📤 Enviar al gestor</button></div><p class="small muted" style="margin-top:8px">Se t'obrirà WhatsApp, el correu… per enviar-li l'enllaç. Funciona 24 hores i qualsevol que el tingui pot baixar el paquet: envia'l només al gestor.</p>`);
     }
   }catch(e){ if(e&&(e.code==="declined"||e.code==="cancelled")) st("Descàrrega cancel·lada."); else st("No s'ha pogut preparar el paquet. Torna-ho a provar.", true); }
   if(btn) btn.disabled=false;
@@ -1708,22 +1711,6 @@ async function uploadLink(blob, name, type, btn){
     return location.origin+d.url;
   }catch{ toast("No s'ha pogut preparar l'enllaç. Torna-ho a provar."); return ""; }
   finally{ if(btn) btn.innerHTML=lbl; }
-}
-async function gestorSave(which, btn){
-  const G=GESTOR_FILE; if(!G) return;
-  const xl=which==="xlsx", key=xl?"lx":"lz";
-  if(!G[key]) G[key]= xl ? await uploadLink(G.xlsx, `Resum ${G.y}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", btn) : await uploadLink(G.blob, G.fname, "application/zip", btn);
-  const url=G[key]; if(!url) return; GESTOR_LINK=url;
-  const what=xl?`l'Excel del ${G.y}`:`el paquet del ${G.y}`;
-  openSheet(xl?"Excel per al gestor":"Paquet per al gestor", `<div class="form">
-    <p>Ja tens ${what} preparat. Què vols fer?</p>
-    <div class="gact col">
-      ${navigator.share?`<button type="button" class="btn primary" data-act="gestorShareLink">📤 Enviar-lo (WhatsApp, correu…)</button>`:""}
-      <a class="btn${navigator.share?"":" primary"}" href="${url}" target="_blank" rel="noopener">⬇️ Descarregar al mòbil</a>
-      <button type="button" class="btn" data-act="gestorCopy">🔗 Copiar l'enllaç</button>
-    </div>
-    <p class="small muted">L'enllaç funciona durant 24 hores i qualsevol que el tingui pot baixar el fitxer: envia'l només al gestor. Si "Descarregar" no et funciona, copia l'enllaç i enganxa'l a Chrome o Samsung Internet.</p>
-    <div class="actions"><button type="button" class="btn ghost" data-act="gestor">Enrere</button></div></div>`);
 }
 /* ---------- companies timeline (rental to companies) ---------- */
 const EMPCOL=["#2F5BEA","#E0A526","#1F9D6B","#B05FD8","#E0573A","#2BA3B8"];
@@ -3562,7 +3549,9 @@ const ACT = {
       <div class="actions"><button class="btn primary">Desar</button></div></form>`);
     $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
       await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
-  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSave: (id,b) => gestorSave("save",b), gestorXlsx: (id,b) => gestorSave("xlsx",b), gestorShareLink: async () => { try{ await navigator.share({title:"Documents per al gestor", text:"Documents dels lloguers per al gestor (l'enllaç caduca en 24 hores):", url:GESTOR_LINK}); }catch{} },
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSend: async () => { if(!GESTOR_LINK) return;
+    if(navigator.share){ try{ await navigator.share({title:"Documents per al gestor", text:"Documents dels lloguers per al gestor (l'enllaç caduca en 24 hores):", url:GESTOR_LINK}); }catch{} return; }
+    try{ await navigator.clipboard.writeText(GESTOR_LINK); toast("Enllaç copiat: enganxa'l al missatge per al gestor"); }catch{ toast(GESTOR_LINK); } }, gestorShareLink: async () => { try{ await navigator.share({title:"Documents per al gestor", text:"Documents dels lloguers per al gestor (l'enllaç caduca en 24 hores):", url:GESTOR_LINK}); }catch{} },
   gestorCopy: async () => { try{ await navigator.clipboard.writeText(GESTOR_LINK); toast("Enllaç copiat"); }catch{ toast(GESTOR_LINK); } }, showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
   chkNotDup: async id => { try{ await db.doc("moves/"+id).update({notDup:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkPeriod: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; try{ await db.doc("moves/"+id).update({period:ymOf(x.date)}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
