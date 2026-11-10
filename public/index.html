@@ -1739,9 +1739,41 @@ function invPanel(p){
     ${L.length?`<ul class="invl">${L.map(x=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span></span><b class="num">${eur(x.amount)}</b>${x.docId?`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">Enviar</button>`:""}</li>`).join("")}</ul>`:`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`}
   </section>`;
 }
-function invForm(pid){
-  const p=propById(pid); if(!p) return; const I=p.inv||{}, c=current(pid)[0];
+// Omple sola les dades de la factura llegint l'última factura de lloguer del pis (la de Homy, que ja les porta totes).
+async function invAuto(p, c){
+  const I={...(p.inv||{})}; let caddr=c.tenantAddress||"";
+  if(caddr && I.emName && I.emNif && I.emAddr && I.pl2) return {I, caddr};
+  const rents=movesOf(p.id).filter(x=>x.type==="ingres"&&x.docId&&/pdf/.test(x.docMime||"pdf")).sort((a,b)=>(b.contractId===c.id)-(a.contractId===c.id)||String(b.date).localeCompare(a.date));
+  for(const x of rents.slice(0,3)){
+    try{
+      const blob=await (await fetch("/_blob/"+x.docId,{credentials:"same-origin"})).blob();
+      const t=await pdfText(await loadPdf(blob),2); if(t.chars<100) continue;
+      const r=await sample.json(`Aquesta és una factura de lloguer. Extreu-ne les dades. Respon NOMÉS amb JSON:
+{"client_nom":"","client_cif":"","client_adreca":"adreça del client tal com surt, en una línia","immoble_linia1":"Inmueble sito en España - <comunitat> - <ciutat>","immoble_linia2":"<codi postal> <carrer, número, pis i porta>","emissor_nom":"nom de qui emet la factura (el propietari)","emissor_nif":"","emissor_adreca":"adreça de l'emissor en una línia"}
+${t.text.slice(0,8000)}`);
+      if(!r) continue;
+      const sameClient = !r.client_cif || !c.cif || norm(r.client_cif)===norm(c.cif);
+      if(!caddr && sameClient && r.client_adreca) caddr=String(r.client_adreca).trim();
+      if(!I.emName && r.emissor_nom) I.emName=String(r.emissor_nom).trim();
+      if(!I.emNif && r.emissor_nif) I.emNif=String(r.emissor_nif).trim();
+      if(!I.emAddr && r.emissor_adreca) I.emAddr=String(r.emissor_adreca).trim();
+      if(!I.pl2 && r.immoble_linia2){ I.pl2=String(r.immoble_linia2).trim(); if(r.immoble_linia1) I.pl1=String(r.immoble_linia1).trim(); }
+      if(caddr && I.emName && I.emNif && I.emAddr && I.pl2) break;
+    }catch(e){ console.warn("invAuto", e); }
+  }
+  if(!I.pl2 && p.address) I.pl2=p.address;
+  try{ await db.doc("props/"+p.id).update({inv:I}); if(caddr && caddr!==(c.tenantAddress||"")) await db.doc("contracts/"+c.id).update({tenantAddress:caddr}); }catch{}
+  return {I, caddr};
+}
+async function invForm(pid){
+  const p=propById(pid); if(!p) return; const c=current(pid)[0];
   if(!c){ toast("Aquest pis no té cap empresa amb el lloguer vigent"); return; }
+  const P0=p.inv||{};
+  if(!(c.tenantAddress && P0.emName && P0.emNif && P0.emAddr && P0.pl2)){
+    openSheet("Factura de llum o aigua", `<div class="chkok"><span class="spin">⏳</span><div><b>Preparant les dades de la factura</b><p class="muted">Les agafo de l'última factura de lloguer del pis. Només cal el primer cop.</p></div></div>`);
+    await invAuto(p, c);
+  }
+  const I=(propById(pid)||p).inv||{}; c.tenantAddress=(conById(c.id)||c).tenantAddress||c.tenantAddress;
   const td=today(), first=td.slice(0,8)+"01";
   openSheet("Factura de llum o aigua", `<form class="form" id="f-inv">
     <div class="seg3" role="radiogroup" aria-label="Tipus"><label><input type="radio" name="kind" value="Luz" checked>💡 Llum</label><label><input type="radio" name="kind" value="AGUA">💧 Aigua</label></div>
@@ -1749,7 +1781,7 @@ function invForm(pid){
     <div class="row2">${field("Període: des del", `<input type="date" name="from" value="${esc(I.lastTo||first)}" required>`)}${field("fins al", `<input type="date" name="to" value="${esc(td)}" required>`)}</div>
     <div class="row2">${field("Número de factura", `<input name="no" inputmode="numeric" value="${esc(I.next||"")}" placeholder="p. ex. 22" required>`)}${field("Data de la factura", `<input type="date" name="date" value="${td}" required>`)}</div>
     <p class="small muted">Per a: <b>${esc(c.tenantName||"")}</b>${c.cif?` · ${esc(c.cif)}`:""}</p>
-    <details class="fold" ${(!c.tenantAddress||!I.emName)?"open":""}><summary>Dades de la factura ${(!c.tenantAddress||!I.emName)?"(omple-les el primer cop)":""}</summary>
+    <details class="fold" ${(!c.tenantAddress||!I.emName||!I.emNif||!I.pl2)?"open":""}><summary>Dades de la factura ${(!c.tenantAddress||!I.emName||!I.emNif||!I.pl2)?"(en falta alguna, revisa-les)":"(revisar o canviar)"}</summary>
       ${field("Adreça de l'empresa", `<input name="caddr" value="${esc(c.tenantAddress||"")}" placeholder="España - Barcelona - Rambla Catalunya 73">`)}
       ${field("Adreça del pis (línia 1)", `<input name="pl1" value="${esc(I.pl1||"Inmueble sito en España - Catalunya - Tarragona")}">`)}
       ${field("Adreça del pis (línia 2)", `<input name="pl2" value="${esc(I.pl2||"")}" placeholder="43001 Carrer de Lleida, 23 1o 2a">`)}
