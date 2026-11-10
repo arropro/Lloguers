@@ -765,7 +765,7 @@ body.priv main .r .num::after, body.priv main .fah .far .num::after{left:auto;ri
   .mline .netpill{grid-column:1/-1;border-radius:999px;padding:7px 14px 7px 8px}
 }
 @media (min-width:900px){.hero .htower{margin-right:clamp(40px,8vw,140px)}}
-canvas.fw{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+canvas.fw{position:fixed;pointer-events:none;z-index:60}
 .fpay{font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;border:0;border-radius:999px;padding:4px 11px;background:var(--accent);color:#fff;box-shadow:0 4px 12px -6px var(--accent)}
 .fpay:hover{filter:brightness(1.1)}
 .gbtn .gic.chk{background:var(--accent);color:#fff}
@@ -1148,13 +1148,19 @@ function renderRail(){
 // Els imports grans s'encongeixen si no hi caben (així no es tallen al mòbil).
 /* ---------- Focs artificials quan s'ha cobrat tot ---------- */
 let FW_LAST=0;
+// Quan marques l'últim lloguer des de baix, puja fins a l'edifici perquè vegis els focs.
+let CEL_T=0;
+function celebrateIfFull(){ clearTimeout(CEL_T); CEL_T=setTimeout(()=>{ const t=document.querySelector("main .htower.full"); if(!t) return;
+  const r=t.getBoundingClientRect(); const visible=r.top>=0&&r.bottom<=innerHeight;
+  if(!visible) window.scrollTo({top:0,behavior:"smooth"});
+  setTimeout(()=>fireworks(true), visible?0:650); }, 700); }
 function fireworks(force){
   const hero=document.querySelector("main .hero"), tw=hero&&hero.querySelector(".htower"); if(!tw) return;
-  try{ if(matchMedia("(prefers-reduced-motion: reduce)").matches) return; }catch(e){}
   if(!force && Date.now()-FW_LAST<60000) return; FW_LAST=Date.now();
-  const old=hero.querySelector("canvas.fw"); if(old) old.remove();
-  const cv=document.createElement("canvas"); cv.className="fw"; hero.appendChild(cv);
+  // El llenç va fora de la pantalla de l'app (a sobre de tot), perquè si l'app es redibuixa mentre dura no s'esborrin els focs.
+  const old=document.querySelector("canvas.fw"); if(old) old.remove();
   const dpr=Math.min(2,window.devicePixelRatio||1), hr=hero.getBoundingClientRect(), W=hr.width, H=hr.height;
+  const cv=document.createElement("canvas"); cv.className="fw"; cv.style.cssText=`left:${hr.left}px;top:${hr.top}px;width:${W}px;height:${H}px;border-radius:${getComputedStyle(hero).borderRadius}`; document.body.appendChild(cv);
   cv.width=W*dpr; cv.height=H*dpr; const ctx=cv.getContext("2d"); ctx.scale(dpr,dpr);
   const sr=tw.querySelector("svg").getBoundingClientRect(), bx=sr.left-hr.left, by=sr.top-hr.top, bw=sr.width, bh=sr.height;
   const COLS=["#FFD66B","#F5B931","#FF8A5B","#FF5C8A","#7EE0A8","#6FA8FF","#C59BFF","#FFF4D6"];
@@ -1892,7 +1898,7 @@ function payMonthForm(key){
       ${st==="unpaid"?`<button class="btn" data-act="clearUnpaid" data-id="${key}">Treure la marca de no cobrat</button>`:`<button class="btn danger" data-act="markUnpaid" data-id="${key}">No s'ha cobrat</button>`}`}
   </div>`);
 }
-async function addRentMove(c, mo, extra={}){
+async function addRentMove(c, mo, extra={}){ setTimeout(celebrateIfFull,0);
   const r=split(c,mo), fee=r.fee||0, gross=fee>0?Math.round((r.base+r.iva-r.ret)*100)/100:r.net;
   await db.collection("moves").add({type:"ingres", date:payDate(c,mo), amount:gross, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, concept:`Lloguer ${monthName(mo)}`, provider:c.tenantName||"", vat:0, source:"marcat", createdAt:Date.now(), ...extra});
   if(false) await db.collection("moves").add({type:"despesa", date:payDate(c,mo), amount:fee, propId:c.propId, contractId:c.id, category:"Comissió plataforma", period:mo, concept:`Comissió ${c.platform||"plataforma"} ${String(c.feePct).replace(".",",")}% · ${monthName(mo)}`, provider:c.platform||"Plataforma", vat:0, source:"marcat", createdAt:Date.now()});
@@ -3570,7 +3576,7 @@ const ACT = {
     try{ for(const x of ms) await db.doc("moves/"+x.id).delete();
       toastUndo(`${shortProp(propById(pid)?.name)}: ${monthName(m)} ja no consta com a cobrat`, async()=>{ for(const d of saved) await db.collection("moves").add(d); }); }
     catch{ toast("No s'ha pogut desfer."); } },
-  quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); }catch{ toast("No s'ha pogut desar."); } },
+  quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); celebrateIfFull(); }catch{ toast("No s'ha pogut desar."); } },
   allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
   markUnpaid: async key => { const [cid,mo]=key.split("|"); const c=conById(cid); try{ await db.doc("contracts/"+cid).update({unpaid:[...new Set([...(c.unpaid||[]), mo])]}); closeSheet(); toast(`${monthLabel(mo)} marcat com a no cobrat`); }catch{ toast("No s'ha pogut desar."); } },
