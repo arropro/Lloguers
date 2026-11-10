@@ -1739,6 +1739,13 @@ function invPanel(p){
     ${L.length?`<ul class="invl">${L.map(x=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span></span><b class="num">${eur(x.amount)}</b>${x.docId?`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">Enviar</button>`:""}</li>`).join("")}</ul>`:`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`}
   </section>`;
 }
+// Si la teva adreça és al mateix carrer que el pis però amb un altre número (Homy hi posa el 25), fes servir el número del pis.
+function fixEmAddr(p, a){
+  const m=String(p.address||"").match(/^\s*([^,]+?),\s*(\d+[a-z]?)/i); if(!m||!a) return a;
+  const street=norm(m[1]).replace(/^(carrer|calle|c)\s+(de\s+)?/,""), num=m[2];
+  const n=String(a).match(/^(.*?)(\d+[a-z]?)(.*)$/i); if(!n) return a;
+  return norm(n[1]).includes(street) && n[2]!==num ? n[1]+num+n[3] : a;
+}
 // Omple sola les dades de la factura llegint l'última factura de lloguer del pis (la de Homy, que ja les porta totes).
 async function invAuto(p, c){
   const I={...(p.inv||{})}; let caddr=c.tenantAddress||"";
@@ -1762,6 +1769,7 @@ ${t.text.slice(0,8000)}`);
     }catch(e){ console.warn("invAuto", e); }
   }
   if(!I.pl2 && p.address) I.pl2=p.address;
+  if(I.emAddr) I.emAddr=fixEmAddr(p, I.emAddr);
   try{ await db.doc("props/"+p.id).update({inv:I}); if(caddr && caddr!==(c.tenantAddress||"")) await db.doc("contracts/"+c.id).update({tenantAddress:caddr}); }catch{}
   return {I, caddr};
 }
@@ -1773,7 +1781,9 @@ async function invForm(pid){
     openSheet("Factura de llum o aigua", `<div class="chkok"><span class="spin">⏳</span><div><b>Preparant les dades de la factura</b><p class="muted">Les agafo de l'última factura de lloguer del pis. Només cal el primer cop.</p></div></div>`);
     await invAuto(p, c);
   }
-  const I=(propById(pid)||p).inv||{}; c.tenantAddress=(conById(c.id)||c).tenantAddress||c.tenantAddress;
+  const I=(propById(pid)||p).inv||{};
+  if(I.emAddr && fixEmAddr(p,I.emAddr)!==I.emAddr){ I.emAddr=fixEmAddr(p,I.emAddr); db.doc("props/"+pid).update({inv:I}).catch(()=>{}); }
+  c.tenantAddress=(conById(c.id)||c).tenantAddress||c.tenantAddress;
   const td=today(), first=td.slice(0,8)+"01";
   openSheet("Factura de llum o aigua", `<form class="form" id="f-inv">
     <div class="seg3" role="radiogroup" aria-label="Tipus"><label><input type="radio" name="kind" value="Luz" checked>💡 Llum</label><label><input type="radio" name="kind" value="AGUA">💧 Aigua</label></div>
