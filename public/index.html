@@ -786,6 +786,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .flegend span{display:inline-flex;align-items:center;gap:6px}
 .flegend b{font-size:.72rem}.flegend b+b{margin-left:-3px}
 @media (max-width:640px){.panel-h:has(.flegend){flex-wrap:wrap;gap:6px}.flegend{width:100%;font-size:.76rem}}
+.gact{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1680,13 +1681,31 @@ async function gestorBuild(y, pids){
         let path=`${root}/${gSafe(f.pn)}/${f.folder}/${f.name}`; let k=2; while(used.has(path)){ path=`${root}/${gSafe(f.pn)}/${f.folder}/${f.name.replace(/(\.[^.]+)$/,` (${k++})$1`)}`; } used.add(path); zip.file(path, bl); }
       catch{ fail++; } }
     st(`<span class="thinking"><span class="dot"></span>Comprimint…</span>`);
-    const blob=await zip.generateAsync({type:"blob"});
-    await downloadsCap.save({filename:`Gestor ${y}.zip`, data:blob});
-    st(`Fet: ${files.length-fail} documents i el resum en Excel.${fail?` ${fail} no s'han pogut afegir.`:""}${D.falta.length?` Mira la pestanya «Què falta» de l'Excel.`:""}`);
+    const blob=await zip.generateAsync({type:"blob", mimeType:"application/octet-stream"});
+    const fname=`Gestor ${y}.zip`, msg=`${files.length-fail} documents i el resum en Excel.${fail?` ${fail} no s'han pogut afegir.`:""}${D.falta.length?` Mira la pestanya «Què falta» de l'Excel.`:""}`;
+    const mobile=matchMedia("(pointer:coarse)").matches;
+    if(!mobile){ await downloadsCap.save({filename:fname, data:blob}); st(`Fet: ${msg}`); }
+    else {
+      // Al mòbil no el descarreguem sol: Android l'obria amb una altra app (Claude). Tries tu què fer-ne.
+      GESTOR_FILE={blob, fname, xlsx:new Blob([XL.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}), y};
+      const zf=new File([blob],fname,{type:"application/zip"}), canZip=!!(navigator.canShare&&navigator.canShare({files:[zf]}));
+      st(`<b>Llest:</b> ${msg}<div class="gact"><button type="button" class="btn primary" data-act="gestorSave">⬇️ Desar al mòbil</button>${canZip?`<button type="button" class="btn" data-act="gestorShare">📤 Enviar…</button>`:""}<button type="button" class="btn" data-act="gestorXlsx">📊 Només l'Excel</button></div><p class="small muted" style="margin-top:8px">Es desa a la carpeta Baixades del mòbil.</p>`);
+    }
   }catch(e){ if(e&&(e.code==="declined"||e.code==="cancelled")) st("Descàrrega cancel·lada."); else st("No s'ha pogut preparar el paquet. Torna-ho a provar.", true); }
   if(btn) btn.disabled=false;
 }
 
+let GESTOR_FILE=null;
+async function gestorSave(which){
+  const G=GESTOR_FILE; if(!G) return;
+  try{
+    if(which==="share"){ await navigator.share({files:[new File([G.blob],G.fname,{type:"application/zip"})], title:G.fname}); return; }
+    if(which==="xlsx"){ const f=new File([G.xlsx],`Resum ${G.y}.xlsx`,{type:G.xlsx.type});
+      if(navigator.canShare&&navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:f.name}); return; }
+      await downloadsCap.save({filename:f.name, data:new Blob([G.xlsx],{type:"application/octet-stream"})}); toast("Excel desat a Baixades"); return; }
+    await downloadsCap.save({filename:G.fname, data:G.blob}); toast("Desat a Baixades");
+  }catch(e){ if(e&&e.name!=="AbortError") toast("No s'ha pogut fer. Torna-ho a provar."); }
+}
 /* ---------- companies timeline (rental to companies) ---------- */
 const EMPCOL=["#2F5BEA","#E0A526","#1F9D6B","#B05FD8","#E0573A","#2BA3B8"];
 function empPanel(p){
@@ -3524,7 +3543,7 @@ const ACT = {
       <div class="actions"><button class="btn primary">Desar</button></div></form>`);
     $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
       await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
-  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSave: () => gestorSave("save"), gestorShare: () => gestorSave("share"), gestorXlsx: () => gestorSave("xlsx"), showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
   chkNotDup: async id => { try{ await db.doc("moves/"+id).update({notDup:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkPeriod: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; try{ await db.doc("moves/"+id).update({period:ymOf(x.date)}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkLink: async key => { const [id,cid]=key.split("|"); try{ await db.doc("moves/"+id).update({contractId:cid}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
