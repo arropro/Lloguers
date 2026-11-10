@@ -793,6 +793,8 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .invl{list-style:none;margin:12px 0 0;padding:0}
 .invl li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
 .invl li > span{flex:1;min-width:0}
+.btn.danger{color:var(--out)}
+.linkbtn.del{text-decoration:none;opacity:.7}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1736,7 +1738,7 @@ function invPanel(p){
   const L=invList(p).slice(0,4);
   return `<section class="panel"><div class="panel-h"><h2>Factures de llum i aigua</h2></div>
     <button type="button" class="btn primary" data-act="invForm" data-id="${p.id}" style="width:100%;justify-content:center;padding:13px">🧾 Fer factura de llum o aigua</button>
-    ${L.length?`<ul class="invl">${L.map(x=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span></span><b class="num">${eur(x.amount)}</b>${x.docId?`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">Enviar</button>`:""}</li>`).join("")}</ul>`:`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`}
+    ${L.length?`<ul class="invl">${L.map(x=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span></span><b class="num">${eur(x.amount)}</b>${x.docId?`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">Enviar</button>`:""}<button type="button" class="linkbtn del" data-act="invDel" data-id="${x.id}" data-confirm="Esborrar?" aria-label="Esborrar la factura ${esc(x.invNo||"")}">🗑</button></li>`).join("")}</ul>`:`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`}
   </section>`;
 }
 // Si la teva adreça és al mateix carrer que el pis però amb un altre número (Homy hi posa el 25), fes servir el número del pis.
@@ -1813,9 +1815,9 @@ async function invForm(pid){
       const nn=/^\d+$/.test(d.no)?String(+d.no+1):"";
       await db.doc("props/"+pid).update({inv:{...I, next:nn, pl1:d.pl1, pl2:d.pl2, emName:d.emName, emNif:d.emNif, emAddr:d.emAddr, lastTo:d.to}});
       if(d.caddr!==(c.tenantAddress||"")) await db.doc("contracts/"+c.id).update({tenantAddress:d.caddr});
-      INV_LAST={blob, fname, docId:r.id};
+      INV_LAST={blob, fname, docId:r.id, moveId:ref.id};
       openSheet("Factura feta ✓", `<div class="form"><p>Factura <b>${esc(d.no)}</b> de ${kindCa.toLowerCase()} per a ${esc(d.cname)}: <b>${eur(amt)}</b>. Ja és als documents del pis i compta com a ingrés.</p>
-        <div class="gact col"><button type="button" class="btn primary" data-act="invSendLast">📤 Enviar la factura</button><a class="btn" href="/_blob/${esc(r.id)}" target="_blank" rel="noopener">👁 Veure-la</a></div>
+        <div class="gact col"><button type="button" class="btn primary" data-act="invSendLast">📤 Enviar la factura</button><a class="btn" href="/_blob/${esc(r.id)}" target="_blank" rel="noopener">👁 Veure-la</a><button type="button" class="btn ghost danger" data-act="invDel" data-id="${ref.id}" data-confirm="Toca un altre cop per esborrar-la">🗑 Esborrar-la</button></div>
         <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Tancar</button></div></div>`);
     }catch(e){ console.warn(e); toast("No s'ha pogut fer la factura. Torna-ho a provar."); b.disabled=false; b.textContent="Fer la factura"; }
   });
@@ -3728,6 +3730,12 @@ const ACT = {
   invForm: id => invForm(id),
   invSendLast: () => { if(INV_LAST) invShare(INV_LAST.blob, INV_LAST.fname); },
   invSend: id => invSendMove(id),
+  invDel: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; const p=propById(x.propId);
+    try{ await db.doc("moves/"+id).delete(); if(x.docId) assets.delete(x.docId).catch(()=>{});
+      // Si era l'última factura, el número torna a quedar lliure.
+      if(p && p.inv && /^\d+$/.test(String(x.invNo||"")) && String(p.inv.next)===String(+x.invNo+1)) await db.doc("props/"+p.id).update({inv:{...p.inv, next:String(x.invNo)}});
+      if(INV_LAST&&INV_LAST.moveId===id){ INV_LAST=null; closeSheet(); }
+      toast(`Factura ${x.invNo||""} esborrada`); }catch{ toast("No s'ha pogut esborrar."); } },
   quickUnpaidProp: async pid => { const m=curMonth(); const ms=current(pid).flatMap(c=>rentMoves(c,m)); if(!ms.length) return;
     const saved=ms.map(x=>{ const {id,...d}=x; return d; });
     try{ for(const x of ms) await db.doc("moves/"+x.id).delete();
