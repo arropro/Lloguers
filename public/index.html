@@ -782,7 +782,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .spk-tip.on{opacity:1;transform:none}
 .spk-tip b{font-size:.78rem;text-transform:capitalize}
 .spk-tip .ti{color:color-mix(in srgb,var(--in) 55%,#fff)}.spk-tip .to{color:color-mix(in srgb,var(--out) 45%,#fff)}
-.flegend{flex-wrap:wrap;gap:6px 16px;align-items:center}
+.rlg{margin:-4px 2px 12px;font-size:.78rem;row-gap:4px;column-gap:14px}.rlg i{width:16px}.rlg b{font-size:.7rem}
 .flegend span{display:inline-flex;align-items:center;gap:6px}
 .flegend b{font-size:.72rem}.flegend b+b{margin-left:-3px}
 @media (max-width:640px){.panel-h:has(.flegend){flex-wrap:wrap;gap:6px}.flegend{width:100%;font-size:.76rem}}
@@ -1299,7 +1299,8 @@ function viewResum(){
     ${todo.length? `<ul class="todo">${todo.slice(0,4).map(todoLi).join("")}</ul>${todo.length>4?`<details class="fold" data-fold="todo-more"${S.open.has("todo-more")?" open":""}><summary><span>Veure ${todo.length-4} més</span>${CHEV}</summary><ul class="todo" style="margin-top:10px">${todo.slice(4).map(todoLi).join("")}</ul></details>`:""}` : `<p class="muted">Tot al dia: lloguers anotats, contractes vigents i fiances en ordre.</p>`}
   </section>
   <section class="panel">
-    <div class="panel-h"><h2>Últims 12 mesos</h2><div class="legend flegend"><span><svg width="22" height="10" aria-hidden="true"><path d="M1 7 C6 7 7 3 11 3 S16 6 21 4" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>Lloguer cobrat</span><span><svg width="22" height="10" aria-hidden="true"><path d="M1 5 H21" stroke="var(--out)" stroke-width="2" stroke-dasharray="4 3" stroke-linecap="round"/></svg>Despeses i hipoteca</span><span><b class="tup">▲</b><b class="tdn">▼</b>Últims 3 mesos vs. els 3 d'abans</span></div></div>
+    <div class="panel-h"><h2>Últims 12 mesos</h2></div>
+    <div class="plg rlg"><span><i style="background:linear-gradient(90deg,#3987e5 0 25%,#d95926 25% 50%,#199e70 50% 75%,#c98500 75%)"></i>Cobrat</span><span><i class="dsh"></i>Despeses i hipoteca</span><span><b class="tup">▲</b>/<b class="tdn">▼</b> vs. 3 mesos abans</span></div>
     ${flatTiles()}
     ${yearLine(vm)}
   </section>
