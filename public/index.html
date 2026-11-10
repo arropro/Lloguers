@@ -788,6 +788,8 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 @media (max-width:640px){.panel-h:has(.flegend){flex-wrap:wrap;gap:6px}.flegend{width:100%;font-size:.76rem}}
 .gact{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.gact.col{flex-direction:column}.gact.col .btn{justify-content:center;text-align:center}
 .linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
+.funpay{font:inherit;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:transparent;color:var(--muted)}
+.funpay:hover{color:var(--ink);border-color:var(--muted)}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1239,7 +1241,9 @@ function viewResum(){
     const st = !cs.length ? `<span class="chip">Sense contracte</span>` : cs.every(c=>rentPaid(c,m)) ? `<span class="chip ok">Cobrat</span>` : `<span class="chip ${dom>=10?"bad":"warn"}">Pendent</span>`;
     const stc = !cs.length ? "" : cs.every(c=>rentPaid(c,m)) ? "ok" : dom>=10?"bad":"warn";
     const pend=cs.filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m));
-    const okb = pend.length ? `<button type="button" class="fpay" data-act="quickPaidProp" data-id="${p.id}" aria-label="Marcar ${esc(p.name)} com a cobrat">✓ Marcar cobrat</button>` : "";
+    const paidMs = cs.flatMap(c=>rentMoves(c,m));
+    const okb = (pend.length ? `<button type="button" class="fpay" data-act="quickPaidProp" data-id="${p.id}" aria-label="Marcar ${esc(p.name)} com a cobrat">✓ Marcar cobrat</button>` : "")
+      + (paidMs.length ? `<button type="button" class="funpay" data-act="quickUnpaidProp" data-id="${p.id}" title="Desfer el cobrament d'aquest mes" aria-label="Desfer el cobrament de ${esc(p.name)}">↩︎ Desfer</button>` : "");
     return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)}${isEmp(p)?` <span class="chip emp">Empresa</span>`:""}</span>
       <span class="famt num">${cs.length?eur(prev):"—"}</span>
       <span class="fmeta">${st}${okb}${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span></span></div>`;
@@ -3561,6 +3565,11 @@ const ACT = {
     openSheet("Separar la fiança", `<div class="form"><p class="muted">${fmtDate(x.date)} · cobrament de ${eur(x.amount)}. Quina part era la fiança?</p><label class="field"><span>Import de la fiança</span><input id="chk-f" type="text" inputmode="decimal" value="${String(sug).replace(".",",")}"></label><p class="small muted">${dep?`Al contracte hi consta una fiança de ${eur(dep)}. `:""}Es restarà del lloguer i quedarà anotada com a fiança, que no compta com a ingrés.</p><div class="actions"><button type="button" class="btn ghost" data-act="checkData">Enrere</button><button type="button" class="btn primary" data-act="chkFianGo" data-id="${id}">Separar</button></div></div>`); },
   chkFianGo: id => chkFianGo(id),
   chkRead: ids => chkRead(ids),
+  quickUnpaidProp: async pid => { const m=curMonth(); const ms=current(pid).flatMap(c=>rentMoves(c,m)); if(!ms.length) return;
+    const saved=ms.map(x=>{ const {id,...d}=x; return d; });
+    try{ for(const x of ms) await db.doc("moves/"+x.id).delete();
+      toastUndo(`${shortProp(propById(pid)?.name)}: ${monthName(m)} ja no consta com a cobrat`, async()=>{ for(const d of saved) await db.collection("moves").add(d); }); }
+    catch{ toast("No s'ha pogut desfer."); } },
   quickPaidProp: async pid => { const m=curMonth(); const cs=current(pid).filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${propById(pid)?.name||"Pis"}: ${monthName(m)} cobrat`); }catch{ toast("No s'ha pogut desar."); } },
   allPaidMonth: async () => { const m=curMonth(); const cs=current().filter(c=>!rentPaid(c,m) && !(c.unpaid||[]).includes(m)); try{ for(const c of cs) await addRentMove(c,m); toast(`${cs.length} lloguer${cs.length>1?"s":""} de ${monthName(m)} anotats`); }catch{ toast("No s'ha pogut desar."); } }, markAllPaid: id => markAllPaidForm(id), markAllPaidGo,
   payOther: key => { const [cid,mo]=key.split("|"); const c=conById(cid); if(!c) return; const r=split(c,mo); moveForm({type:"ingres", date:payDate(c,mo), amount:r.net, propId:c.propId, contractId:c.id, category:"Lloguer", period:mo, provider:c.tenantName, concept:`Lloguer ${monthName(mo)}`}); },
