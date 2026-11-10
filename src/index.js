@@ -396,6 +396,22 @@ export default {
       }
       if (p === "/api/login" && request.method === "POST") return await login(request, env);
       if (p === "/login") return html(LOGIN_HTML());
+      // Enllaços de descàrrega (paquet del gestor): són llargs i aleatoris i caduquen en 24 h, així es poden obrir des de qualsevol navegador o enviar al gestor.
+      if (p.startsWith("/dl/")) {
+        const id = p.split("/")[2];
+        if (!validId(id)) return err("not_found", 404);
+        const meta = await env.BLOBS.get(`t:${id}`, { type: "json" });
+        if (!meta) return html("<p style='font-family:sans-serif;padding:24px'>Aquest fitxer ja no està disponible. Torna'l a generar des de l'app.</p>");
+        const { readable, writable } = new TransformStream();
+        const pump = (async () => {
+          for (let i = 0; i < meta.parts; i++) { const v = await env.BLOBS.get(`t:${id}:${i}`, { type: "stream" }); if (!v) break; await v.pipeTo(writable, { preventClose: true }); }
+          await writable.close();
+        })().catch(e => writable.abort(e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(pump);
+        const h = { "content-type": meta.type, "content-disposition": `attachment; filename="${meta.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(meta.name)}`, "cache-control": "no-store" };
+        if (meta.size) h["content-length"] = String(meta.size);
+        return new Response(readable, { headers: h });
+      }
       const ok = await isLoggedIn(request, env);
       if (!ok) {
         if (p.startsWith("/api/") || p.startsWith("/_blob/")) return err("unauthenticated", 401);
@@ -416,25 +432,10 @@ export default {
       }
       if (p === "/api/dl/done" && request.method === "POST") {
         const b = await request.json().catch(() => ({}));
-        if (!validId(b.id) || !(b.parts > 0 && b.parts <= 50)) return err("invalid_request", 400);
+        if (!validId(b.id) || b.id.length < 24 || !(b.parts > 0 && b.parts <= 50)) return err("invalid_request", 400);
         const name = String(b.name || "fitxer").replace(/[\\/:*?"<>|\r\n]+/g, "_").slice(0, 120);
         await env.BLOBS.put(`t:${b.id}`, JSON.stringify({ parts: b.parts, name, type: String(b.type || "application/octet-stream").slice(0, 100), size: Number(b.size) || 0 }), { expirationTtl: 86400 });
         return json({ url: "/dl/" + b.id + "/" + encodeURIComponent(name) });
-      }
-      if (p.startsWith("/dl/")) {
-        const id = p.split("/")[2];
-        if (!validId(id)) return err("not_found", 404);
-        const meta = await env.BLOBS.get(`t:${id}`, { type: "json" });
-        if (!meta) return html("<p style='font-family:sans-serif;padding:24px'>Aquest fitxer ja no està disponible. Torna'l a generar des de l'app.</p>");
-        const { readable, writable } = new TransformStream();
-        const pump = (async () => {
-          for (let i = 0; i < meta.parts; i++) { const v = await env.BLOBS.get(`t:${id}:${i}`, { type: "stream" }); if (!v) break; await v.pipeTo(writable, { preventClose: true }); }
-          await writable.close();
-        })().catch(e => writable.abort(e));
-        if (ctx && ctx.waitUntil) ctx.waitUntil(pump);
-        const h = { "content-type": meta.type, "content-disposition": `attachment; filename="${meta.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(meta.name)}`, "cache-control": "no-store" };
-        if (meta.size) h["content-length"] = String(meta.size);
-        return new Response(readable, { headers: h });
       }
       if (p.startsWith("/_blob/")) {
         const id = decodeURIComponent(p.slice(7));

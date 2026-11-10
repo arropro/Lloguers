@@ -786,7 +786,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .flegend span{display:inline-flex;align-items:center;gap:6px}
 .flegend b{font-size:.72rem}.flegend b+b{margin-left:-3px}
 @media (max-width:640px){.panel-h:has(.flegend){flex-wrap:wrap;gap:6px}.flegend{width:100%;font-size:.76rem}}
-.gact{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.gact{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.gact.col{flex-direction:column}.gact.col .btn{justify-content:center;text-align:center}
 .linkbtn{font:inherit;background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;cursor:pointer}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
@@ -1696,29 +1696,34 @@ async function gestorBuild(y, pids){
 }
 
 let GESTOR_FILE=null, GESTOR_LINK="";
-// Al mòbil, el fitxer es puja al teu servidor i es baixa com qualsevol descàrrega del navegador
-// (les descàrregues fetes des de l'app mateixa Android les passava a una altra app).
-async function serverDownload(blob, name, type, btn){
-  const id=[...crypto.getRandomValues(new Uint8Array(12))].map(b=>b.toString(16).padStart(2,"0")).join(""), CH=20*1024*1024, parts=Math.max(1,Math.ceil(blob.size/CH));
+// Al mòbil, el fitxer es puja al teu servidor i en surt un enllaç (caduca en 24 h) que pots enviar al gestor,
+// copiar o obrir en qualsevol navegador. Les descàrregues fetes des de l'app Android les passava a una altra app.
+async function uploadLink(blob, name, type, btn){
+  const id=[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,"0")).join(""), CH=20*1024*1024, parts=Math.max(1,Math.ceil(blob.size/CH));
   const lbl=btn&&btn.innerHTML;
   try{
     for(let i=0;i<parts;i++){ if(btn) btn.innerHTML=`Preparant… ${Math.round(i/parts*100)}%`;
       const r=await fetch(`/api/dl/part?id=${id}&n=${i}`,{method:"POST",credentials:"same-origin",body:blob.slice(i*CH,(i+1)*CH)}); if(!r.ok) throw new Error("part"); }
     const d=await (await fetch("/api/dl/done",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({id,parts,name,type,size:blob.size})})).json();
-    const full=location.origin+d.url;
-    if(/Android/i.test(navigator.userAgent)){
-      // A Android, la descàrrega s'obre a Chrome (fora de l'app) perquè el fitxer vagi a Descàrregues i no a una altra app.
-      location.href=`intent://${location.host}${d.url}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(full)};end`;
-      GESTOR_LINK=full; setTimeout(()=>{ const n=$("#g-st"); if(n&&!n.querySelector(".glink")) n.insertAdjacentHTML("beforeend",`<p class="small glink" style="margin-top:8px">Si no s'ha descarregat, <a href="${full}" target="_blank" rel="noopener">obre aquest enllaç</a> o <button type="button" class="linkbtn" data-act="gestorCopy">copia'l</button> i enganxa'l a Chrome. Funciona durant 24 hores.</p>`); },1500);
-    } else location.assign(d.url);
-    toast("Descarregant… el trobaràs a Descàrregues");
-  }catch{ toast("No s'ha pogut preparar la descàrrega. Torna-ho a provar."); }
+    return location.origin+d.url;
+  }catch{ toast("No s'ha pogut preparar l'enllaç. Torna-ho a provar."); return ""; }
   finally{ if(btn) btn.innerHTML=lbl; }
 }
 async function gestorSave(which, btn){
   const G=GESTOR_FILE; if(!G) return;
-  if(which==="xlsx") return serverDownload(G.xlsx, `Resum ${G.y}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", btn);
-  return serverDownload(G.blob, G.fname, "application/zip", btn);
+  const xl=which==="xlsx", key=xl?"lx":"lz";
+  if(!G[key]) G[key]= xl ? await uploadLink(G.xlsx, `Resum ${G.y}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", btn) : await uploadLink(G.blob, G.fname, "application/zip", btn);
+  const url=G[key]; if(!url) return; GESTOR_LINK=url;
+  const what=xl?`l'Excel del ${G.y}`:`el paquet del ${G.y}`;
+  openSheet(xl?"Excel per al gestor":"Paquet per al gestor", `<div class="form">
+    <p>Ja tens ${what} preparat. Què vols fer?</p>
+    <div class="gact col">
+      ${navigator.share?`<button type="button" class="btn primary" data-act="gestorShareLink">📤 Enviar-lo (WhatsApp, correu…)</button>`:""}
+      <a class="btn${navigator.share?"":" primary"}" href="${url}" target="_blank" rel="noopener">⬇️ Descarregar al mòbil</a>
+      <button type="button" class="btn" data-act="gestorCopy">🔗 Copiar l'enllaç</button>
+    </div>
+    <p class="small muted">L'enllaç funciona durant 24 hores i qualsevol que el tingui pot baixar el fitxer: envia'l només al gestor. Si "Descarregar" no et funciona, copia l'enllaç i enganxa'l a Chrome o Samsung Internet.</p>
+    <div class="actions"><button type="button" class="btn ghost" data-act="gestor">Enrere</button></div></div>`);
 }
 /* ---------- companies timeline (rental to companies) ---------- */
 const EMPCOL=["#2F5BEA","#E0A526","#1F9D6B","#B05FD8","#E0573A","#2BA3B8"];
@@ -3557,7 +3562,8 @@ const ACT = {
       <div class="actions"><button class="btn primary">Desar</button></div></form>`);
     $("#f-dep").onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(e.target), v=fd.get("st");
       await save(()=>db.doc("contracts/"+id).update({deposit:parseAmt(fd.get("deposit")), incasol:v==="dip", depositUnpaid:v==="no"}), "Fiança desada"); }; },
-  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSave: (id,b) => gestorSave("save",b), gestorXlsx: (id,b) => gestorSave("xlsx",b), gestorCopy: async () => { try{ await navigator.clipboard.writeText(GESTOR_LINK); toast("Enllaç copiat"); }catch{ toast(GESTOR_LINK); } }, showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
+  gestor: () => gestorForm(), gestorGo: () => gestorForm(true), gestorSave: (id,b) => gestorSave("save",b), gestorXlsx: (id,b) => gestorSave("xlsx",b), gestorShareLink: async () => { try{ await navigator.share({title:"Documents per al gestor", text:"Documents dels lloguers per al gestor (l'enllaç caduca en 24 hores):", url:GESTOR_LINK}); }catch{} },
+  gestorCopy: async () => { try{ await navigator.clipboard.writeText(GESTOR_LINK); toast("Enllaç copiat"); }catch{ toast(GESTOR_LINK); } }, showContract: id => showContract(id), eyear: y => { S.ey=+y; render(); }, inVerify: id => verifyForm(id), payMonth: id => payMonthForm(id), payHistory: id => payHistory(id), quickPaid, checkData: () => checkData(),
   chkNotDup: async id => { try{ await db.doc("moves/"+id).update({notDup:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkPeriod: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; try{ await db.doc("moves/"+id).update({period:ymOf(x.date)}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkLink: async key => { const [id,cid]=key.split("|"); try{ await db.doc("moves/"+id).update({contractId:cid}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
