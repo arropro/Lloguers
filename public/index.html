@@ -811,6 +811,11 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .ctop .penbtn{margin-left:4px;width:34px;height:34px}
 .cdet{border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
 .dlink.dend{color:var(--out);border-color:color-mix(in srgb,var(--out) 35%,var(--line));background:color-mix(in srgb,var(--out) 6%,transparent)}
+.hchip{display:flex;align-items:center;gap:10px}
+.hchip .chip{font-size:.78rem;font-weight:600}
+.ctop.lean{display:block}
+.ctop.lean .ctype{display:block;margin-top:4px;color:var(--muted);font-size:.92rem}
+.crumb.allc{margin-top:12px;font-weight:600}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1584,8 +1589,8 @@ function tabResum(p){
   </section>
   <div class="grid2">
     <section class="panel">
-      ${isEmp(p)&&S.ey&&S.ey<+today().slice(0,4)?(()=>{ const yc=yearContracts(p,S.ey); return `<div class="panel-h"><h3>Contractes del ${S.ey}</h3><button class="btn sm ghost" data-act="eyear" data-id="${today().slice(0,4)}">Tornar al ${today().slice(0,4)}</button></div>${yc.length?`<div style="display:grid;gap:18px">${yc.map(c=>contractCard(c,false)).join("")}</div>`:`<p class="muted">Cap contracte el ${S.ey}.</p>`}`; })():`<div class="panel-h"><h3>Contracte vigent</h3><button class="btn sm ghost" data-act="ptab" data-id="contractes">Tots els contractes →</button></div>
-      ${vig.length? `<div style="display:grid;gap:18px">${vig.map(c=>contractCard(c,false)).join("")}</div>` : `<div class="empty" style="padding:16px"><p>No hi ha cap contracte vigent.</p><button class="btn sm primary" data-act="newContract" data-id="${p.id}">${isEmp(p)?"Nova empresa":"Afegir contracte"}</button></div>`}`}
+      ${isEmp(p)&&S.ey&&S.ey<+today().slice(0,4)?(()=>{ const yc=yearContracts(p,S.ey); return `<div class="panel-h"><h3>Contractes del ${S.ey}</h3><button class="btn sm ghost" data-act="eyear" data-id="${today().slice(0,4)}">Tornar al ${today().slice(0,4)}</button></div>${yc.length?`<div style="display:grid;gap:18px">${yc.map(c=>contractCard(c,false)).join("")}</div>`:`<p class="muted">Cap contracte el ${S.ey}.</p>`}`; })():`${vig.length===1?`<div class="panel-h"><h3 class="hchip">Contracte <span class="chip ok">Vigent</span></h3><button class="penbtn" data-act="editContract" data-id="${vig[0].id}" title="Editar el contracte" aria-label="Editar el contracte">${PENCIL}</button></div>`:`<div class="panel-h"><h3>Contractes vigents</h3></div>`}
+      ${vig.length? `<div style="display:grid;gap:18px">${vig.map(c=>contractCard(c,false,vig.length===1)).join("")}</div><button class="crumb allc" data-act="ptab" data-id="contractes">Veure tots els contractes →</button>` : `<div class="empty" style="padding:16px"><p>No hi ha cap contracte vigent.</p><button class="btn sm primary" data-act="newContract" data-id="${p.id}">${isEmp(p)?"Nova empresa":"Afegir contracte"}</button></div>`}`}
     </section>
     <section class="panel">
       <div class="panel-h"><h3>Dades del pis</h3><button class="penbtn" data-act="editProp" data-id="${p.id}" title="Editar les dades del pis" aria-label="Editar les dades del pis">${PENCIL}</button></div>
@@ -1944,7 +1949,7 @@ function showContract(id){
 /* ---------- contracts ---------- */
 const docIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5"/></svg>`;
 const ENDICON=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></svg>`;
-function contractCard(c, full=true){
+function contractCard(c, full=true, lean=false){
   const st=cStatus(c), cm=curMonth(), r=split(c,cm), td=today();
   let bar="";
   if(c.start && c.end){ const tot=Math.max(1,daysBetween(c.start,c.end)), done=Math.min(tot,Math.max(0,daysBetween(c.start,td)));
@@ -1962,11 +1967,11 @@ function contractCard(c, full=true){
   const hist=[...(c.rents||[])].filter(x=>x&&x.from).sort((a,b)=>b.from.localeCompare(a.from));
   const docs=(c.docs||[]);
   return `<article class="ccard ${full?(st==="vigent"?"vig":st==="futur"?"fut":""):"flat"}">
-    <div class="ctop"><h3>${esc(c.tenantName||"Sense inquilí")}${c.tenantType==="empresa"&&c.cif?`<span class="nif">NIF ${esc(c.cif)}${copyBtn(c.cif)}</span>`:""}</h3>
+    ${lean?`<div class="ctop lean"><h3>${esc(c.tenantName||"Sense inquilí")}${c.tenantType==="empresa"&&c.cif?`<span class="nif">NIF ${esc(c.cif)}${copyBtn(c.cif)}</span>`:""}</h3><span class="ctype">${c.tenantType==="empresa"?"Empresa":"Particular"}${c.unitLabel&&c.unitLabel!=="Pis sencer"?" · "+esc(c.unitLabel):""}</span></div>`:`<div class="ctop"><h3>${esc(c.tenantName||"Sense inquilí")}${c.tenantType==="empresa"&&c.cif?`<span class="nif">NIF ${esc(c.cif)}${copyBtn(c.cif)}</span>`:""}</h3>
       <span class="chip ${c.tenantType==="empresa"?"emp":""}">${c.tenantType==="empresa"?"Empresa":"Particular"}</span>
       ${c.unitLabel&&c.unitLabel!=="Pis sencer"?`<span class="chip">${esc(c.unitLabel)}</span>`:""}
       <span class="chip ${st==="vigent"?"ok":st==="futur"?"warn":""}">${st==="vigent"?"Vigent":st==="futur"?"Proper":"Acabat"}</span>
-      <button class="penbtn" data-act="editContract" data-id="${c.id}" title="Editar el contracte" aria-label="Editar el contracte">${PENCIL}</button></div>
+      <button class="penbtn" data-act="editContract" data-id="${c.id}" title="Editar el contracte" aria-label="Editar el contracte">${PENCIL}</button></div>`}
     ${bar}
     <div class="kv">
       ${isTotalMode(c)?`<div><span class="label">Preu de l'estada</span><span class="num">${eur(contractRentTotal(c))}</span><span class="small muted">${c.start&&c.end?daysBetween(c.start,c.end)+1+" dies":""}${extrasOf(c,"mensual")+extrasOf(c,"unic")?` · + ${eur(extrasOf(c,"mensual")+extrasOf(c,"unic"))} de repercussions`:""}</span></div>`
