@@ -795,9 +795,9 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .invl li > span{flex:1;min-width:0}
 .btn.danger{color:var(--out)}
 .linkbtn.del{text-decoration:none;opacity:.7}
-.penbtn{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--accent);box-shadow:0 4px 12px -8px rgb(0 0 0 / .3);transition:background .15s,transform .15s}
+.penbtn{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;background:color-mix(in srgb,#F5B931 18%,transparent);color:#B07A00;border:1px solid color-mix(in srgb,#F5B931 50%,transparent);transition:background .15s,transform .15s}
 .penbtn svg{width:18px;height:18px}
-.penbtn:hover{background:color-mix(in srgb,var(--accent) 10%,var(--surface));transform:translateY(-1px)}
+.penbtn:hover{background:color-mix(in srgb,#F5B931 30%,transparent);transform:translateY(-1px)}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
