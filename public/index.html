@@ -795,6 +795,9 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .invl li > span{flex:1;min-width:0}
 .btn.danger{color:var(--out)}
 .linkbtn.del{text-decoration:none;opacity:.7}
+.penbtn{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--accent);box-shadow:0 4px 12px -8px rgb(0 0 0 / .3);transition:background .15s,transform .15s}
+.penbtn svg{width:18px;height:18px}
+.penbtn:hover{background:color-mix(in srgb,var(--accent) 10%,var(--surface));transform:translateY(-1px)}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1572,7 +1575,7 @@ function tabResum(p){
       ${vig.length? `<div style="display:grid;gap:18px">${vig.map(c=>contractCard(c,false)).join("")}</div>` : `<div class="empty" style="padding:16px"><p>No hi ha cap contracte vigent.</p><button class="btn sm primary" data-act="newContract" data-id="${p.id}">${isEmp(p)?"Nova empresa":"Afegir contracte"}</button></div>`}`}
     </section>
     <section class="panel">
-      <div class="panel-h"><h3>Dades del pis</h3><button class="btn sm ghost" data-act="editProp" data-id="${p.id}">Editar</button></div>
+      <div class="panel-h"><h3>Dades del pis</h3><button class="penbtn" data-act="editProp" data-id="${p.id}" title="Editar les dades del pis" aria-label="Editar les dades del pis">${PENCIL}</button></div>
       <div class="kv">
         <div><span class="label">Data de compra</span><span>${p.purchaseDate?fmtDate(p.purchaseDate):"—"}</span></div>
         <div><span class="label">Preu</span><span class="num">${p.price?eur(p.price):"—"}</span></div>
@@ -1609,7 +1612,7 @@ function mortgagePanel(p,k){
   const M=k.M;
   if(!M) return `<section class="panel"><div class="panel-h"><h3>Hipoteca</h3><button class="btn sm" data-act="editMortgage" data-id="${p.id}">Afegir hipoteca</button></div><p class="small muted">Si aquest pis té hipoteca, escaneja l'escriptura del préstec (o afegeix-la a mà) i calcularé la quota, el capital pendent, els interessos de cada any i la rendibilitat sobre els diners que hi has posat tu.</p></section>`;
   const paid=M.principal-k.bal, pc=Math.round(paid/M.principal*100), y=today().slice(0,4);
-  return `<section class="panel"><div class="panel-h"><h3>Hipoteca${M.bank?" · "+esc(M.bank):""}</h3><button class="btn sm" data-act="editMortgage" data-id="${p.id}">Editar</button></div>
+  return `<section class="panel"><div class="panel-h"><h3>Hipoteca${M.bank?" · "+esc(M.bank):""}</h3><button class="penbtn" data-act="editMortgage" data-id="${p.id}" title="Editar la hipoteca" aria-label="Editar la hipoteca">${PENCIL}</button></div>
     ${!M.ok?`<div class="note warn" style="margin-bottom:12px">Amb aquestes dades la hipoteca no s'acaba de pagar. Revisa la quota, el tipus d'interès o el termini.</div>`:""}
     ${M.ok&&M.mismatch?`<div class="note warn" style="margin-bottom:12px">La quota que has posat (${eur(+M.payment)}) no quadra amb el capital, el TIN i el termini: amb aquestes dades seria de ${eur(M.calc)}. Sol passar si el tipus és el TAE en lloc del TIN o si la quota inclou alguna assegurança. Per quadrar-ho amb el banc, posa el <b>capital pendent</b> que surt al teu últim rebut.</div>`:""}
     <div class="kv">
