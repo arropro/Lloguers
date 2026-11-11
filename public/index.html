@@ -565,7 +565,8 @@ details.fold>summary:focus-visible{outline:2px solid var(--accent);outline-offse
 .fcard{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface);transition:transform .15s, box-shadow .15s}
 .fcard:hover{transform:translateY(-2px);box-shadow:0 14px 30px -18px rgb(14 27 58 / .45)}
 .fcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.fcard .fimg{display:block;height:92px;overflow:hidden;background:var(--sunk)}
+.fcard .fimg{display:block;position:relative;height:92px;overflow:hidden;background:var(--sunk)}
+.fcard .fflag{position:absolute;left:6px;bottom:6px;display:flex}.fcard .fflag .chip{background:rgb(255 255 255 / .88);color:#22304D;font-size:.68rem;padding:2px 8px;line-height:1.4}.fcard .fflag .chip.emp{background:var(--emp);color:#fff}.fcard .fflag .chip.hab{background:var(--warn);color:#fff}
 .fcard .fimg img,.fcard .fimg svg{width:100%;height:100%;object-fit:cover;display:block}
 .fcard .fbody{display:grid;gap:4px;padding:12px 14px 14px}
 .fcard .fname{font-weight:700;font-size:.92rem;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -574,7 +575,7 @@ details.fold>summary:focus-visible{outline:2px solid var(--accent);outline-offse
 @media (max-width:640px){.fcard .fmeta{gap:6px}.fcard .fpay{padding:4px 8px;font-size:.75rem}}
 .fcard .famtrow{display:flex;gap:2px 8px;align-items:baseline;flex-wrap:wrap}.fcard .famtrow .small{font-size:.72rem;white-space:nowrap}
 .fcard.loose{border-style:dashed}
-@media (max-width:640px){.fgrid{grid-template-columns:1fr;gap:10px;grid-auto-rows:1fr}.fcard{flex-direction:row}.fcard .fimg{width:104px;height:auto;min-height:92px;flex:none}.fcard .famt{font-size:1.1rem}}
+@media (max-width:640px){.fgrid{grid-template-columns:1fr;gap:10px;grid-auto-rows:1fr}.fcard{flex-direction:row}.fcard .fimg{width:36%;max-width:150px;height:auto;min-height:100px;flex:none}.fcard .fbody{padding:10px 12px 12px;gap:3px;align-content:center}.fcard .fimg img,.fcard .fimg svg{position:absolute;inset:0}.fcard .famt{font-size:1.1rem}}
 .askbar{display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:16px;padding:14px 16px}
 .askq{display:grid;gap:2px;margin-right:auto}
 .askpills{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -1281,7 +1282,7 @@ function viewResum(){
     const paidMs = cs.flatMap(c=>rentMoves(c,m));
     const okb = (pend.length ? `<button type="button" class="fpay" data-act="quickPaidProp" data-id="${p.id}" aria-label="Marcar ${esc(p.name)} com a cobrat">✓ Marcar cobrat</button>` : "")
       + (paidMs.length ? `<button type="button" class="funpay" data-act="quickUnpaidProp" data-id="${p.id}" title="Desfer el cobrament d'aquest mes" aria-label="Desfer el cobrament de ${esc(p.name)}">↩︎ Desfer</button>` : "");
-    return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)} ${shortModeChip(p)}</span>
+    return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}<span class="fflag">${shortModeChip(p)}</span></span><span class="fbody"><span class="fname">${esc(p.name)}</span>
       <span class="famtrow"><span class="famt num">${cs.length?eur(prev):"—"}</span>${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span>
       <span class="fmeta">${st}${okb}</span></span></div>`;
   }).join("");
