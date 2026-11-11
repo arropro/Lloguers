@@ -2025,6 +2025,10 @@ function dataIssues(){
   // 4. Imports o dates estranyes
   vm.filter(x=>!(+x.amount>0)||!isDate(x.date)).forEach(x=>out.push({k:"bad", chip:"Import", t:`<b>${pn(x.propId)}</b><div class="small muted">Moviment sense import o sense data: ${esc(x.concept||x.category||"")}</div>`, act:`<button class="btn sm" data-act="editMove" data-id="${x.id}">Arreglar</button>`}));
   vm.filter(x=>isDate(x.date)&&x.date>dShift(31)).forEach(x=>out.push({k:"warn", chip:"Data", t:`<b>${pn(x.propId)}</b><div class="small muted">Té una data molt endavant: ${line(x)}</div>`, act:`<button class="btn sm" data-act="editMove" data-id="${x.id}">Revisar</button>`}));
+  // 4b. Contractes de particulars sense l'import de la fiança
+  current().filter(c=>c.tenantType!=="empresa" && !(+c.deposit>0) && !c.depositNone && propById(c.propId)).forEach(c=>{ const hasDoc=(c.docs||[]).length>0;
+    out.push({k:"warn", chip:"Fiança", t:`<b>${pn(c.propId)}</b> · ${esc(c.tenantName||"")}<div class="small muted">No hi ha l'import de la fiança${hasDoc?". El puc buscar al contracte.":"."}</div>`,
+      act:`${hasDoc?`<button class="btn sm primary" data-act="chkDep" data-id="${c.id}">Busca-la al contracte</button>`:""}<button class="btn sm${hasDoc?"":" primary"}" data-act="depositForm" data-id="${c.id}">Posar-la</button><button class="btn sm" data-act="chkDepNone" data-id="${c.id}">No n'hi ha</button>`}); });
   // 5. Moviments sense pis i hipoteques que no quadren
   const loose=vm.filter(x=>!x.propId).length; if(loose) out.push({k:"warn", chip:"Sense pis", t:`<b>${loose} moviment${loose>1?"s":""} sense pis</b><div class="small muted">No compten a cap pis fins que no els assignis</div>`, act:`<button class="btn sm" data-act="looseMoves">Assignar</button>`});
   sortedProps().forEach(p=>{ const M=mtg(p); if(M&&!M.ok) out.push({k:"warn", chip:"Hipoteca", t:`<b>${esc(p.name)}</b><div class="small muted">Les dades de la hipoteca no quadren</div>`, act:`<button class="btn sm" data-act="editMortgage" data-id="${p.id}">Revisar</button>`}); });
@@ -2058,6 +2062,21 @@ ${text?"Text de la factura:\n"+text.slice(0,12000):""}`, imgs.length?{images:img
       ${r.explicacio?`<div class="note">${esc(r.explicacio)}</div>`:""}
       <div class="actions">${fi>0?`<button type="button" class="btn" data-act="chkFian" data-id="${[...ms].sort((a,b)=>b.amount-a.amount)[0].id}|${fi}">Separar la fiança (${eur(fi)})</button>`:""}<button type="button" class="btn primary" data-act="chkOk" data-id="${ids}">${fi>0?"Deixar-ho així":"D'acord, és correcte"}</button></div></div>`);
   }catch(e){ console.warn("chkRead",e); openSheet("No he pogut llegir-la", `<p class="muted">${esc(aiErr(e&&e.code)||"Torna-ho a provar d'aquí a una estona.")}</p><div class="actions"><button type="button" class="btn" data-act="checkData">Enrere</button></div>`); }
+}
+// Llegeix el document del contracte i en treu l'import de la fiança.
+async function chkDep(cid){
+  const c=conById(cid); if(!c) return; const d=(c.docs||[])[0]; if(!d) return;
+  if(!sample){ toast(aiErr("not_granted")); return; }
+  openSheet("Buscant la fiança…", `<div class="chkok"><span class="spin">⏳</span><div><b>Estic llegint el contracte</b><p class="muted">Tarda uns segons.</p></div></div>`);
+  try{
+    const blob=await (await fetch("/_blob/"+d.id,{credentials:"same-origin"})).blob(); let text="", imgs=[];
+    if(/pdf/.test(d.mime||blob.type)){ const pdf=await loadPdf(blob); const t=await pdfText(pdf,12); if(t.chars>300) text=t.text; else for(let i=1;i<=Math.min(4,pdf.numPages);i++) imgs.push(await pageJpeg(pdf,i)); }
+    else imgs.push(await prepUpload(blob));
+    const r=await sample.json(`Això és un contracte de lloguer. Busca l'import de la FIANÇA (fianza, depósito, garantia). Respon NOMÉS amb JSON: {"fianca": número en euros o null si no n'hi ha o no surt, "frase": "la frase del contracte on surt, curta"}${text?"\n\n"+text.slice(0,20000):""}`, imgs.length?{images:imgs}:{});
+    const v=+(r&&r.fianca)||0;
+    if(v>0){ await db.doc("contracts/"+cid).update({deposit:Math.round(v*100)/100}); toast(`Fiança trobada: ${eur(v)}`); checkData(); }
+    else { toast("No he trobat la fiança al contracte. Posa-la a mà."); ACT.depositForm(cid); }
+  }catch(e){ console.warn(e); toast("No he pogut llegir el contracte."); checkData(); }
 }
 async function chkFianGo(mid){
   const x=S.moves.find(m=>m.id===mid); if(!x) return; const v=Math.round(parseFloat(String($("#chk-f").value).replace(",","."))*100)/100;
@@ -3751,6 +3770,8 @@ const ACT = {
     openSheet("Separar la fiança", `<div class="form"><p class="muted">${fmtDate(x.date)} · cobrament de ${eur(x.amount)}. Quina part era la fiança?</p><label class="field"><span>Import de la fiança</span><input id="chk-f" type="text" inputmode="decimal" value="${String(sug).replace(".",",")}"></label><p class="small muted">${dep?`Al contracte hi consta una fiança de ${eur(dep)}. `:""}Es restarà del lloguer i quedarà anotada com a fiança, que no compta com a ingrés.</p><div class="actions"><button type="button" class="btn ghost" data-act="checkData">Enrere</button><button type="button" class="btn primary" data-act="chkFianGo" data-id="${id}">Separar</button></div></div>`); },
   chkFianGo: id => chkFianGo(id),
   chkRead: ids => chkRead(ids),
+  chkDep: id => chkDep(id),
+  chkDepNone: async id => { try{ await db.doc("contracts/"+id).update({depositNone:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   invForm: id => invForm(id),
   invSendLast: () => { if(INV_LAST) invShare(INV_LAST.blob, INV_LAST.fname); },
   invSend: id => invSendMove(id),
