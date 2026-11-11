@@ -898,6 +898,7 @@ const PTYPES = ["Pis","Casa","Local","Altres"];
 const MODES = {tradicional:"Lloguer tradicional", habitacions:"Lloguer per habitacions", empresa:"Lloguer per empreses"};
 const modeChip = (p, extra="") => p && p.rentalMode==="empresa" ? `<span class="chip emp">Lloguer per empreses${extra}</span>` : p && p.rentalMode==="habitacions" ? `<span class="chip hab">Lloguer per habitacions</span>` : `<span class="chip">Lloguer tradicional</span>`;
 const isHab = p => !!p && p.rentalMode==="habitacions";
+const shortModeChip = p => p && p.rentalMode==="empresa" ? `<span class="chip emp">Empresa</span>` : p && p.rentalMode==="habitacions" ? `<span class="chip hab">Habitacions</span>` : `<span class="chip">Tradicional</span>`;
 function modeSeg(cur){ return `<div class="seg3" role="radiogroup" aria-label="Tipus de lloguer">${Object.entries(MODES).map(([v,l])=>`<label><input type="radio" name="rentalMode" value="${v}" ${cur===v?"checked":""}>${l}</label>`).join("")}</div>`; }
 function needMode(f){ if(f.querySelector("input[name=rentalMode]:checked")) return false; const sg=f.querySelector(".seg3"); if(sg){ sg.classList.add("need"); sg.scrollIntoView({block:"center",behavior:"smooth"}); } toast("Tria el tipus de lloguer."); return true; }
 const FOLDERS = [["propietat","Propietat i escriptures"],["hipoteca","Hipoteca"],["contractes","Contractes"],["subministraments","Subministraments"],["assegurances","Assegurances"],["impostos","Impostos i taxes"],["factures","Factures i rebuts"],["altres","Altres"]];
@@ -1280,7 +1281,7 @@ function viewResum(){
     const paidMs = cs.flatMap(c=>rentMoves(c,m));
     const okb = (pend.length ? `<button type="button" class="fpay" data-act="quickPaidProp" data-id="${p.id}" aria-label="Marcar ${esc(p.name)} com a cobrat">✓ Marcar cobrat</button>` : "")
       + (paidMs.length ? `<button type="button" class="funpay" data-act="quickUnpaidProp" data-id="${p.id}" title="Desfer el cobrament d'aquest mes" aria-label="Desfer el cobrament de ${esc(p.name)}">↩︎ Desfer</button>` : "");
-    return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)}${isEmp(p)?` <span class="chip emp">Empresa</span>`:""}</span>
+    return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)} ${shortModeChip(p)}</span>
       <span class="famtrow"><span class="famt num">${cs.length?eur(prev):"—"}</span>${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span>
       <span class="fmeta">${st}${okb}</span></span></div>`;
   }).join("");
