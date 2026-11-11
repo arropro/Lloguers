@@ -798,6 +798,17 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .penbtn{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;background:var(--surface);color:var(--ink);border:1px solid var(--line);transition:background .15s,transform .15s}
 .penbtn svg{width:18px;height:18px}
 .penbtn:hover{background:color-mix(in srgb,var(--ink) 6%,var(--surface));transform:translateY(-1px)}
+.paystat{margin-top:4px}
+.payok{font:inherit;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 14px;border-radius:14px;border:1px solid transparent}
+.payok .pi{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:.8rem;color:#fff}
+.payok .pch{margin-left:auto;font-size:1.2rem;opacity:.6}
+.payok.ok{background:color-mix(in srgb,var(--in) 11%,transparent);border-color:color-mix(in srgb,var(--in) 28%,transparent);color:var(--in);font-weight:600}
+.payok.ok .pi{background:var(--in)}
+.payok.bad{background:color-mix(in srgb,var(--out) 10%,transparent);border-color:color-mix(in srgb,var(--out) 28%,transparent);color:var(--out);font-weight:600}
+.payok.bad .pi{background:var(--out)}
+.payok.warn{background:color-mix(in srgb,#F5B931 14%,transparent);border-color:color-mix(in srgb,#F5B931 40%,transparent);color:#8A5D00;font-weight:600}
+.payok.warn .pi{background:#E0A21A}
+.ctop .penbtn{margin-left:4px;width:34px;height:34px}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1940,8 +1951,10 @@ function contractCard(c, full=true){
   let pays="";
   if(st!=="futur" && c.start){ const all=contractMonths(c, cm), unk=unknownMonths(c), bad=all.filter(mo=>payState(c,mo)==="unpaid"), paidN=all.filter(mo=>payState(c,mo)==="paid").length;
     const lastPaid=[...all].reverse().find(mo=>payState(c,mo)==="paid");
-    const msg = bad.length ? `<span class="neg">${bad.length} mes${bad.length>1?"os":""} sense cobrar (${esc(range(bad))})</span>` : unk.length ? `${unk.length} mes${unk.length>1?"os":""} sense anotar` : `<span class="pos">Tot cobrat${lastPaid?` fins ${/^[aeiou]/.test(monthName(lastPaid))?"a l'":"al "}${monthName(lastPaid)}`:""}</span>`;
-    pays=`<div><span class="label">Cobraments</span><div class="paysum"><span>${msg} <button class="crumb paylink" data-act="payHistory" data-id="${c.id}">Mes a mes ›</button></span></div>
+    const upTo = lastPaid ? ` fins ${/^[aeiou]/.test(monthName(lastPaid))?"a l'":"al "}${monthName(lastPaid)}` : "";
+    const cls = bad.length ? "bad" : unk.length ? "warn" : "ok";
+    const msg = bad.length ? `${bad.length} mes${bad.length>1?"os":""} sense cobrar (${esc(range(bad))})` : unk.length ? `${unk.length} mes${unk.length>1?"os":""} sense anotar` : `Al dia · tot cobrat${upTo}`;
+    pays=`<div class="paystat"><button type="button" class="payok ${cls}" data-act="payHistory" data-id="${c.id}" title="Veure els cobraments mes a mes"><span class="pi">${cls==="ok"?"✓":"!"}</span><span>${msg}</span><span class="pch">›</span></button>
       ${unk.length?`<p class="small" style="margin-top:6px"><button class="crumb" data-act="markAllPaid" data-id="${c.id}">Marcar-${unk.length>1?"los":"lo"} com a cobrat${unk.length>1?"s":""}</button></p>`:""}</div>`; }
   const hist=[...(c.rents||[])].filter(x=>x&&x.from).sort((a,b)=>b.from.localeCompare(a.from));
   const docs=(c.docs||[]);
@@ -1949,7 +1962,8 @@ function contractCard(c, full=true){
     <div class="ctop"><h3>${esc(c.tenantName||"Sense inquilí")}${c.tenantType==="empresa"&&c.cif?`<span class="nif">NIF ${esc(c.cif)}${copyBtn(c.cif)}</span>`:""}</h3>
       <span class="chip ${c.tenantType==="empresa"?"emp":""}">${c.tenantType==="empresa"?"Empresa":"Particular"}</span>
       ${c.unitLabel&&c.unitLabel!=="Pis sencer"?`<span class="chip">${esc(c.unitLabel)}</span>`:""}
-      <span class="chip ${st==="vigent"?"ok":st==="futur"?"warn":""}">${st==="vigent"?"Vigent":st==="futur"?"Proper":"Acabat"}</span></div>
+      <span class="chip ${st==="vigent"?"ok":st==="futur"?"warn":""}">${st==="vigent"?"Vigent":st==="futur"?"Proper":"Acabat"}</span>
+      <button class="penbtn" data-act="editContract" data-id="${c.id}" title="Editar el contracte" aria-label="Editar el contracte">${PENCIL}</button></div>
     ${bar}
     <div class="kv">
       ${isTotalMode(c)?`<div><span class="label">Preu de l'estada</span><span class="num">${eur(contractRentTotal(c))}</span><span class="small muted">${c.start&&c.end?daysBetween(c.start,c.end)+1+" dies":""}${extrasOf(c,"mensual")+extrasOf(c,"unic")?` · + ${eur(extrasOf(c,"mensual")+extrasOf(c,"unic"))} de repercussions`:""}</span></div>`
@@ -1957,7 +1971,6 @@ function contractCard(c, full=true){
       ${(c.extras||[]).length||+c.feePct?`<div><span class="label">${isTotalMode(c)?"Cobres en total":"Cobres al mes"}</span><span class="num">${eur(isTotalMode(c)?contractTotal(c):rentAt(c,cm)+extrasOf(c,"mensual"))}</span>${+c.feePct?`<span class="small muted">${upfrontFee(c)?`comissió de ${esc(c.platform)}: ${eur(feeOn(c,contractRentTotal(c)))} (${String(c.feePct).replace(".",",")}% + IVA) al començament`:`et queden ${eur(split(c,cm).net)} després de la comissió`}</span>`:""}</div>`:""}
     </div>
     ${pays}
-    <div class="cact">${st==="vigent"&&!rentPaid(c,cm)?`<button class="btn sm primary" data-act="quickRent" data-id="${c.id}">✓ He cobrat ${/^[aeiou]/.test(monthName(cm))?"l'":"el "}${monthName(cm)}</button>`:""}<button class="btn sm" data-act="editContract" data-id="${c.id}">Editar contracte</button></div>
     <details class="fold" data-fold="c-${c.id}"${S.open.has("c-"+c.id)?" open":""}><summary><span>Més detalls${docs.length?` · ${docs.length} document${docs.length>1?"s":""}`:""}</span>${CHEV}</summary><div class="foldbody">
     ${c.firstEnd&&c.end&&c.firstEnd<c.end?`<span class="small muted">Primer període fins al ${fmtDate(c.firstEnd)}, després pròrrogues anuals fins al ${fmtDate(c.end)}</span>`:""}
     <div class="kv">
