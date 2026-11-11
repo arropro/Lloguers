@@ -571,6 +571,8 @@ details.fold>summary:focus-visible{outline:2px solid var(--accent);outline-offse
 .fcard .fname{font-weight:700;font-size:.92rem;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .fcard .famt{font-size:1.25rem;font-weight:600}
 .fcard .fmeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media (max-width:640px){.fcard .fmeta{gap:6px}.fcard .fpay{padding:4px 8px;font-size:.75rem}}
+.fcard .famtrow{display:flex;gap:2px 8px;align-items:baseline;flex-wrap:wrap}.fcard .famtrow .small{font-size:.72rem;white-space:nowrap}
 .fcard.loose{border-style:dashed}
 @media (max-width:640px){.fgrid{grid-template-columns:1fr;gap:10px;grid-auto-rows:1fr}.fcard{flex-direction:row}.fcard .fimg{width:104px;height:auto;min-height:92px;flex:none}.fcard .famt{font-size:1.1rem}}
 .askbar{display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:16px;padding:14px 16px}
@@ -1279,8 +1281,8 @@ function viewResum(){
     const okb = (pend.length ? `<button type="button" class="fpay" data-act="quickPaidProp" data-id="${p.id}" aria-label="Marcar ${esc(p.name)} com a cobrat">✓ Marcar cobrat</button>` : "")
       + (paidMs.length ? `<button type="button" class="funpay" data-act="quickUnpaidProp" data-id="${p.id}" title="Desfer el cobrament d'aquest mes" aria-label="Desfer el cobrament de ${esc(p.name)}">↩︎ Desfer</button>` : "");
     return `<div class="fcard" role="button" tabindex="0" data-act="openProp" data-id="${p.id}"><span class="fimg">${visual(p)}</span><span class="fbody"><span class="fname">${esc(p.name)}${isEmp(p)?` <span class="chip emp">Empresa</span>`:""}</span>
-      <span class="famt num">${cs.length?eur(prev):"—"}</span>
-      <span class="fmeta">${st}${okb}${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span></span></div>`;
+      <span class="famtrow"><span class="famt num">${cs.length?eur(prev):"—"}</span>${q?`<span class="small muted">hipoteca ${eur(q)}</span>`:""}${ex?`<span class="small muted">despeses ${eur(ex)}</span>`:""}</span>
+      <span class="fmeta">${st}${okb}</span></span></div>`;
   }).join("");
   const loose = mm.filter(x=>!x.propId);
 
