@@ -11,7 +11,9 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="/i18n.js?v=1"></script>
 <script src="/shim.js"></script>
+<link rel="stylesheet" href="/lang.css?v=1">
 <style>
 #splash{position:fixed;inset:0;z-index:9999;background:var(--sbg,#0B1430);transition:opacity .45s ease;display:grid;place-items:center}
 #splash img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
@@ -842,7 +844,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 
 <div class="shell">
   <aside class="rail">
-    <div class="brand"><div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1A1405" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></div><b>Els meus<br>lloguers</b></div>
+    <div class="brand"><a href="/copia.html" class="mark" aria-label="Ajustos" title="Ajustos"><svg viewBox="0 0 24 24" fill="none" stroke="#1A1405" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></a><b>Els meus<br>lloguers</b></div>
     <nav class="tabs" id="nav" aria-label="Seccions">
       <button class="tab" data-act="nav" data-id="resum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Resum</button>
       <button class="tab" data-act="nav" data-id="props"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Pisos</button>
@@ -850,10 +852,10 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
       <button class="tab scan" data-act="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10"/></svg>Escanejar</button>
     </nav>
     <div class="rail-sec"><span class="rail-label">Els meus pisos</span><div id="rail-props"></div></div>
-    <div class="rail-foot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Privat · només hi tens accés tu</div><a class="rail-foot" href="/copia.html" style="text-decoration:none;color:inherit;margin-top:6px">⚙︎ Còpia de seguretat</a>
+    <div class="rail-foot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Privat · només hi tens accés tu</div><button type="button" class="langbtn rail-lang" data-notr onclick="setLang(window.LLOGUERS_LANG==='es'?'ca':'es')" aria-label="Idioma / Idioma"><span class="flag"></span><span class="lc"></span></button>
   </aside>
   <div class="content">
-    <header class="mtop"><div class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#1A1405" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></div><b>Els meus lloguers</b><a href="/copia.html" aria-label="Còpia de seguretat" style="margin-left:auto;color:inherit;opacity:.7;display:grid;place-items:center;width:34px;height:34px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></a></header>
+    <header class="mtop"><a href="/copia.html" class="mark" aria-label="Ajustos" title="Ajustos"><svg viewBox="0 0 24 24" fill="none" stroke="#1A1405" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></svg></a><b>Els meus lloguers</b><button type="button" class="langbtn" style="margin-left:auto" data-notr onclick="setLang(window.LLOGUERS_LANG==='es'?'ca':'es')" aria-label="Idioma / Idioma"><span class="flag"></span><span class="lc"></span></button></header>
     <main class="wrap" id="main" aria-live="polite">
       <div class="panel empty"><p>Carregant les teves dades…</p></div>
     </main>

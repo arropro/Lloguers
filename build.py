@@ -25,10 +25,16 @@ rep("Has arribat al límit d'ús de Claude per ara. Omple les dades a mà o torn
 rep("Has arribat al límit d'ús de Claude per ara.", "Ara mateix no es pot fer servir la IA (límit d'ús o sense saldo a Anthropic).")
 rep("La pàgina no té permís per fer servir Claude, així que no pot llegir els documents.",
     "L'escaneig amb IA no està configurat (falta la clau d'Anthropic), així que no es poden llegir els documents.")
-rep("Privat · només hi tens accés tu</div>",
-    'Privat · només hi tens accés tu</div><a class="rail-foot" href="/copia.html" style="text-decoration:none;color:inherit;margin-top:6px">⚙︎ Còpia de seguretat</a>')
-rep('<b>Els meus lloguers</b></header>',
-    '<b>Els meus lloguers</b><a href="/copia.html" aria-label="Còpia de seguretat" style="margin-left:auto;color:inherit;opacity:.7;display:grid;place-items:center;width:34px;height:34px"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></a></header>')
+FLAG = ('<button type="button" class="langbtn" data-notr onclick="setLang(window.LLOGUERS_LANG===\'es\'?\'ca\':\'es\')" aria-label="Idioma / Idioma">'
+  '<span class="flag"></span><span class="lc"></span></button>')
+rep('<div class="brand"><div class="mark" aria-hidden="true">', '<div class="brand"><a href="/copia.html" class="mark" aria-label="Ajustos" title="Ajustos">')
+rep('<header class="mtop"><div class="mark" aria-hidden="true">', '<header class="mtop"><a href="/copia.html" class="mark" aria-label="Ajustos" title="Ajustos">')
+# tancar els <a> de les cases: la primera </div> després de cada </svg> del mark
+for tag in ('<div class="brand"><a href="/copia.html"', '<header class="mtop"><a href="/copia.html"'):
+    i = src.index(tag); j = src.index('</svg></div>', i)
+    src = src[:j] + '</svg></a>' + src[j+len('</svg></div>'):]
+rep('<b>Els meus lloguers</b></header>', '<b>Els meus lloguers</b>' + FLAG.replace('class="langbtn"', 'class="langbtn" style="margin-left:auto"') + '</header>')
+rep("Privat · només hi tens accés tu</div>", "Privat · només hi tens accés tu</div>" + FLAG.replace('class="langbtn"', 'class="langbtn rail-lang"'))
 
 head = """<!doctype html>
 <html lang="ca">
@@ -43,7 +49,9 @@ head = """<!doctype html>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script src="/i18n.js?v=1"></script>
 <script src="/shim.js"></script>
+<link rel="stylesheet" href="/lang.css?v=1">
 <style>
 #splash{position:fixed;inset:0;z-index:9999;background:var(--sbg,#0B1430);transition:opacity .45s ease;display:grid;place-items:center}
 #splash img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;

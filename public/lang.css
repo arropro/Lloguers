@@ -1,0 +1,11 @@
+.langbtn{display:inline-flex;align-items:center;gap:6px;background:rgb(255 255 255 / .08);border:1px solid rgb(255 255 255 / .18);color:inherit;border-radius:999px;padding:5px 10px 5px 6px;font:600 .78rem/1 system-ui,sans-serif;cursor:pointer;letter-spacing:.04em}
+.langbtn .flag{width:22px;height:15px;border-radius:3px;display:block;box-shadow:0 0 0 1px rgb(0 0 0 / .15);
+  background:repeating-linear-gradient(180deg,#FCDD09 0 1.667px,#DA121A 1.667px 3.333px)}
+.langbtn .lc::after{content:"CA"}
+html[lang=es] .langbtn .flag{background:linear-gradient(180deg,#AA151B 0 25%,#F1BF00 25% 75%,#AA151B 75%)}
+html[lang=es] .langbtn .lc::after{content:"ES"}
+.rail-lang{margin-top:10px;align-self:flex-start}
+a.mark{text-decoration:none;cursor:pointer}
+@media (max-width:899px){.rail .rail-lang{display:none}}
+button.langbtn{width:auto;flex:none;margin-top:0}
+header .langbtn{margin-left:auto}
