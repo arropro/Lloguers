@@ -809,6 +809,8 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .payok.warn{background:color-mix(in srgb,#F5B931 14%,transparent);border-color:color-mix(in srgb,#F5B931 40%,transparent);color:#8A5D00;font-weight:600}
 .payok.warn .pi{background:#E0A21A}
 .ctop .penbtn{margin-left:4px;width:34px;height:34px}
+.cdet{border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
+.dlink.dend{color:var(--out);border-color:color-mix(in srgb,var(--out) 35%,var(--line));background:color-mix(in srgb,var(--out) 6%,transparent)}
 /* targetes per pis */
 .ftiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 @media (min-width:900px){.ftiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.ftile{padding:16px 16px 10px}.ftv{font-size:1.6rem}}
@@ -1941,6 +1943,7 @@ function showContract(id){
 }
 /* ---------- contracts ---------- */
 const docIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 00-1 1v16a1 1 0 001 1h12a1 1 0 001-1V8z"/><path d="M14 3v5h5"/></svg>`;
+const ENDICON=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 012 2v12a2 2 0 01-2 2h-4"/><path d="M10 16l-4-4 4-4"/><path d="M6 12h10"/></svg>`;
 function contractCard(c, full=true){
   const st=cStatus(c), cm=curMonth(), r=split(c,cm), td=today();
   let bar="";
@@ -1971,7 +1974,7 @@ function contractCard(c, full=true){
       ${(c.extras||[]).length||+c.feePct?`<div><span class="label">${isTotalMode(c)?"Cobres en total":"Cobres al mes"}</span><span class="num">${eur(isTotalMode(c)?contractTotal(c):rentAt(c,cm)+extrasOf(c,"mensual"))}</span>${+c.feePct?`<span class="small muted">${upfrontFee(c)?`comissió de ${esc(c.platform)}: ${eur(feeOn(c,contractRentTotal(c)))} (${String(c.feePct).replace(".",",")}% + IVA) al començament`:`et queden ${eur(split(c,cm).net)} després de la comissió`}</span>`:""}</div>`:""}
     </div>
     ${pays}
-    <details class="fold" data-fold="c-${c.id}"${S.open.has("c-"+c.id)?" open":""}><summary><span>Més detalls${docs.length?` · ${docs.length} document${docs.length>1?"s":""}`:""}</span>${CHEV}</summary><div class="foldbody">
+    <div class="foldbody cdet">
     ${c.firstEnd&&c.end&&c.firstEnd<c.end?`<span class="small muted">Primer període fins al ${fmtDate(c.firstEnd)}, després pròrrogues anuals fins al ${fmtDate(c.end)}</span>`:""}
     <div class="kv">
       ${hist.length?`<div><span class="label">Renda inicial</span><span class="num">${eur(c.rent)}</span></div>`:""}
@@ -1983,9 +1986,9 @@ function contractCard(c, full=true){
     ${(c.extras||[]).length?`<div><span class="label">Repercussions a l'empresa</span><ul class="hist" style="margin-top:4px">${c.extras.map(x=>`<li><span>${esc(x.label||"Concepte")} <span class="muted">· ${(x.freq||"mensual")==="mensual"?"cada mes":"un sol cop"}</span></span><span class="num">${eur(+x.amount||0)}</span></li>`).join("")}</ul></div>`:""}
     ${(c.adds||[]).length?`<div><span class="label">Pagaments addicionals</span><ul class="hist" style="margin-top:4px">${c.adds.map(x=>`<li><span>${monthLabel(x.mo)} <span class="muted">· ${esc(x.note||"")}</span></span><span class="num">${eur(+x.amount||0)}</span></li>`).join("")}</ul></div>`:""}
     ${hist.length?`<div><span class="label">Actualitzacions de renda</span><ul class="hist" style="margin-top:4px">${hist.map(x=>`<li><span>Des de ${monthLabel(x.from)}${x.note?` · <span class="muted">${esc(x.note)}</span>`:""}</span><span class="num">${eur(x.amount)}</span></li>`).join("")}<li><span class="muted">Inicial${c.start?" ("+monthLabel(ymOf(c.start))+")":""}</span><span class="num muted">${eur(c.rent)}</span></li></ul></div>`:""}
-    ${docs.length?`<div class="cdocs">${docs.map(d=>`<button type="button" class="dlink" data-doc="${esc(d.id)}" data-mime="${esc(d.mime||"")}" data-name="${esc(d.label||d.name||"")}">${docIcon}${esc(d.label||"Contracte")}</button>`).join("")}</div>`:`<p class="small muted">Sense el document del contracte. <button class="crumb" data-act="scan" data-id="${c.propId}">Escaneja'l</button> i el vincularé sol.</p>`}
-    ${st==="vigent"?`<div><button class="btn sm ghost" data-act="endContract" data-id="${c.id}">Finalitzar contracte</button></div>`:""}
-    </div></details>
+    ${docs.length||st==="vigent"?`<div class="cdocs">${docs.map(d=>`<button type="button" class="dlink" data-doc="${esc(d.id)}" data-mime="${esc(d.mime||"")}" data-name="${esc(d.label||d.name||"")}">${docIcon}${esc(d.label||"Contracte")}</button>`).join("")}${st==="vigent"?`<button type="button" class="dlink dend" data-act="endContract" data-id="${c.id}">${ENDICON}Finalitzar contracte</button>`:""}</div>`:""}
+    ${docs.length?"":`<p class="small muted">Sense el document del contracte. <button class="crumb" data-act="scan" data-id="${c.propId}">Escaneja'l</button> i el vincularé sol.</p>`}
+    </div>
   </article>`;
 }
 function payHistory(cid){
