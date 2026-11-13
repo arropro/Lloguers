@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=3"></script>
+<script src="/i18n.js?v=4"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -2038,7 +2038,77 @@ function dataIssues(){
   // 5. Moviments sense pis i hipoteques que no quadren
   const loose=vm.filter(x=>!x.propId).length; if(loose) out.push({k:"warn", chip:"Sense pis", t:`<b>${loose} moviment${loose>1?"s":""} sense pis</b><div class="small muted">No compten a cap pis fins que no els assignis</div>`, act:`<button class="btn sm" data-act="looseMoves">Assignar</button>`});
   sortedProps().forEach(p=>{ const M=mtg(p); if(M&&!M.ok) out.push({k:"warn", chip:"Hipoteca", t:`<b>${esc(p.name)}</b><div class="small muted">Les dades de la hipoteca no quadren</div>`, act:`<button class="btn sm" data-act="editMortgage" data-id="${p.id}">Revisar</button>`}); });
+  // ---- Controls nous ----
+  const cm=curMonth(), y0=td.slice(0,4), cname=c=>esc(c.tenantName||"l'inquilí");
+  const allC=S.contracts.filter(c=>propById(c.propId));
+  const setB=(coll,id,field,val,label,primary)=>`<button class="btn sm${primary?" primary":""}" data-act="chkSet" data-id="${coll}|${id}|${field}|${val}">${label}</button>`;
+  // 6. Mesos cobrats a mitges (tot l'últim any)
+  allC.forEach(c=>{ for(let i=12;i>=1;i--){ const mo=addMonths(cm,-i), ms=rentMoves(c,mo); if(!ms.length||ms.every(x=>x.okExtra)) continue;
+    const got=sum(ms), exp=split(c,mo).net; if(exp>0 && got+1<exp && got<exp*0.97) out.push({k:"warn", chip:"Cobrat de menys", t:`<b>${pn(c.propId)}</b> · ${cname(c)}<div class="small muted">${monthLabel(mo)}: cobrat ${eur(got)} i la renda és ${eur(exp)} (falten ${eur(exp-got)})</div>`,
+      act:`<button class="btn sm primary" data-act="payMonth" data-id="${c.id}|${mo}">Revisar</button><button class="btn sm" data-act="chkOk" data-id="${ms.map(x=>x.id).join(",")}">És correcte</button>`}); } });
+  // 7. Llum i aigua dels pisos d'empresa que encara no s'han refacturat
+  const utilKind=x=>{ const t=norm([x.concept,x.provider,x.docName].join(" ")); if(/\b(llum|luz|electric|endesa|iberdrola|naturgy|energia|holaluz|octopus|totalenergies|som energia)/.test(t)) return "Llum"; if(/\b(aigua|agua|aigues|aguas|aqualia|ematsa|sorea|canal)/.test(t)) return "Aigua"; return ""; };
+  sortedProps().filter(isEmp).forEach(p=>{ const inv=vm.filter(x=>x.propId===p.id&&x.category===INV_CAT);
+    vm.filter(x=>x.propId===p.id&&x.type==="despesa"&&x.category==="Subministraments"&&!x.noRebill&&isDate(x.date)&&x.date>=dShift(-365)).forEach(x=>{ const k=utilKind(x); if(!k) return;
+      if(!allC.some(c=>c.propId===p.id&&(!c.start||c.start<=x.date)&&(!c.end||c.end>=x.date))) return;
+      if(inv.some(f=>(f.invKind||"")===k&&f.date>=x.date)) return;
+      out.push({k:"warn", chip:"Refacturar", t:`<b>${esc(p.name)}</b><div class="small muted">Factura de ${k==="Llum"?"llum":"aigua"} sense refacturar a l'empresa: ${line(x)}</div>`,
+        act:`<button class="btn sm primary" data-act="chkInv" data-id="${p.id}">Fer la factura</button>${setB("moves",x.id,"noRebill","1","No cal")}`}); }); });
+  // 8. Renda sense actualitzar (IPC) en més d'un any
+  current().filter(c=>c.tenantType!=="empresa"&&!(c.platform||"").trim()&&!isTotalMode(c)&&c.start&&+c.rent>0).forEach(c=>{
+    const ups=(c.rents||[]).filter(x=>x&&x.from).map(x=>x.from).sort(), last=ups.length?ups[ups.length-1]:ymOf(c.start);
+    if(addMonths(last,12)>cm) return; if(c.ipcAck&&addMonths(c.ipcAck,12)>cm) return;
+    out.push({k:"warn", chip:"Renda", t:`<b>${pn(c.propId)}</b> · ${cname(c)}<div class="small muted">${ups.length?"L'última pujada de renda és de "+monthLabel(last):"El contracte va començar el "+monthLabel(last)+" i no hi consta cap pujada"}. Potser toca actualitzar-la (IPC o IRAV).</div>`,
+      act:`<button class="btn sm primary" data-act="editContract" data-id="${c.id}">Afegir la pujada</button>${setB("contracts",c.id,"ipcAck","mo","Aquest any no toca")}`}); });
+  // 9. Contractes: dos que es trepitgen i cobraments després del final
+  sortedProps().filter(p=>!isHab(p)).forEach(p=>{ const cs=allC.filter(c=>c.propId===p.id&&c.start).sort((a,b)=>a.start.localeCompare(b.start));
+    for(let i=0;i<cs.length;i++) for(let j=i+1;j<cs.length;j++){ const a=cs[i], b=cs[j]; if(b.overlapOk||a.overlapOk) continue; const aEnd=a.end||"9999-12-31";
+      if(b.start<=aEnd && daysBetween(b.start, aEnd<b.end||!b.end?aEnd:b.end)>3) out.push({k:"warn", chip:"Contractes", t:`<b>${esc(p.name)}</b><div class="small muted">Els contractes de ${cname(a)} i ${cname(b)} es trepitgen: ${fmtDate(a.start)}${a.end?" – "+fmtDate(a.end):" (sense final)"} i ${fmtDate(b.start)}${b.end?" – "+fmtDate(b.end):""}</div>`,
+        act:`<button class="btn sm primary" data-act="editContract" data-id="${a.id}">Revisar el de ${esc(shortName(a.tenantName)||"l'inquilí")}</button>${setB("contracts",b.id,"overlapOk","1","És correcte")}`}); } });
+  rents.filter(x=>x.contractId&&!x.okExtra).forEach(x=>{ const c=conById(x.contractId); if(!c||!c.end) return; const mo=movePeriod(x);
+    if(mo>ymOf(c.end) && !(c.adds||[]).some(a=>a&&a.mo===mo)) out.push({k:"warn", chip:"Contracte", t:`<b>${pn(x.propId)}</b> · ${cname(c)}<div class="small muted">Cobrament de ${monthLabel(mo)}, però el contracte s'acaba el ${fmtDate(c.end)}: ${line(x)}</div>`,
+      act:`<button class="btn sm primary" data-act="editContract" data-id="${c.id}">Revisar el contracte</button><button class="btn sm" data-act="editMove" data-id="${x.id}">Revisar el cobrament</button>${setB("moves",x.id,"okExtra","1","És correcte")}`}); });
+  // 10. Fiança que no és d'un, dos o tres mesos de renda
+  current().filter(c=>c.tenantType!=="empresa"&&+c.deposit>0&&!c.depOk&&!isTotalMode(c)).forEach(c=>{ const r=rentAt(c, c.start?ymOf(c.start):cm); if(!(r>0)) return; const q=c.deposit/r;
+    if(Math.round(q)>=1 && Math.round(q)<=3 && Math.abs(q-Math.round(q))<=0.05) return;
+    out.push({k:"warn", chip:"Fiança", t:`<b>${pn(c.propId)}</b> · ${cname(c)}<div class="small muted">La fiança és de ${eur(c.deposit)} i la renda de ${eur(r)}: normalment és d'un o dos mesos de renda.</div>`,
+      act:`<button class="btn sm primary" data-act="depositForm" data-id="${c.id}">Corregir</button>${setB("contracts",c.id,"depOk","1","És correcte")}`}); });
+  // 11. Comissió de la plataforma diferent de la del contracte
+  allC.filter(c=>+c.feePct>0&&!c.feeOk).forEach(c=>{ const ms=commMoves(c); if(!ms.length) return; const got=sum(ms); let exp=0; contractMonths(c, c.end&&ymOf(c.end)<cm?ymOf(c.end):cm).forEach(mo=>{ exp+=feeAt(c,mo); });
+    if(exp>0 && Math.abs(got-exp)>Math.max(5, exp*0.05)) out.push({k:"warn", chip:"Comissió", t:`<b>${pn(c.propId)}</b> · ${cname(c)}<div class="small muted">${esc(c.platform||"La plataforma")} t'ha cobrat ${eur(got)} de comissió i, amb el ${c.feePct}% del contracte, hauria de ser ${eur(exp)}.</div>`,
+      act:`<button class="btn sm primary" data-act="editContract" data-id="${c.id}">Revisar el percentatge</button>${setB("contracts",c.id,"feeOk","1","És correcte")}`}); });
+  // 12. Despeses sense factura (el gestor demana el justificant)
+  sortedProps().forEach(p=>{ const nd=vm.filter(x=>x.propId===p.id&&x.type==="despesa"&&!x.docId&&!x.noDocOk&&isDate(x.date)&&x.date.slice(0,4)>=String(+y0-1)&&+x.amount>0); if(!nd.length) return;
+    out.push({k:"warn", chip:"Sense factura", t:`<b>${esc(p.name)}</b><div class="small muted">${nd.length===1?"1 despesa no té":nd.length+" despeses no tenen"} la factura guardada (${eur(sum(nd))}). El gestor sol demanar el justificant.</div>`,
+      act:`<button class="btn sm primary" data-act="chkNoDocs" data-id="${p.id}">Veure-les</button>`}); });
+  // 13. Números de factura de llum i aigua saltats
+  sortedProps().forEach(p=>{ const nums=[...new Set(vm.filter(x=>x.propId===p.id&&x.category===INV_CAT&&/^\d+$/.test(String(x.invNo||""))).map(x=>+x.invNo))].sort((a,b)=>a-b); if(nums.length<2) return;
+    const miss=[]; for(let n=nums[0]+1;n<nums[nums.length-1];n++) if(!nums.includes(n)) miss.push(n); const ok=(p.invGapOk||[]).map(Number); const left=miss.filter(n=>!ok.includes(n)); if(!left.length) return;
+    out.push({k:"warn", chip:"Factures", t:`<b>${esc(p.name)}</b><div class="small muted">${left.length>1?"Falten els números":"Falta el número"} de factura ${left.join(", ")}: les factures han d'anar seguides.</div>`,
+      act:`<button class="btn sm" data-act="chkGapOk" data-id="${p.id}|${left.join(",")}">D'acord</button>`}); });
+  // 14. Quotes d'hipoteca anotades com a despesa (es compten dues vegades)
+  sortedProps().forEach(p=>{ if(!mtg(p)) return; vm.filter(x=>x.propId===p.id&&x.type==="despesa"&&!x.okExtra&&/\b(hipoteca|prestec|prestamo|quota prestec|cuota prestamo)\b/.test(norm([x.concept,x.provider].join(" ")))).forEach(x=>
+    out.push({k:"warn", chip:"Hipoteca", t:`<b>${esc(p.name)}</b><div class="small muted">Sembla una quota de la hipoteca anotada com a despesa, i la hipoteca ja es compta sola: ${line(x)}</div>`,
+      act:`<button class="btn sm" data-act="delMove" data-id="${x.id}" data-confirm="Confirma: esborrar">Esborrar-la</button>${setB("moves",x.id,"okExtra","1","No és la quota")}`})); });
+  // 15. Moviments d'abans de comprar el pis
+  sortedProps().filter(p=>isDate(p.purchaseDate)).forEach(p=>{ vm.filter(x=>x.propId===p.id&&isDate(x.date)&&x.date<dShiftFrom(p.purchaseDate,-60)&&x.category!=="Despeses de compra"&&!x.okExtra).forEach(x=>
+    out.push({k:"warn", chip:"Data", t:`<b>${esc(p.name)}</b><div class="small muted">Aquest moviment és d'abans de comprar el pis (${fmtDate(p.purchaseDate)}): ${line(x)}</div>`,
+      act:`<button class="btn sm primary" data-act="editMove" data-id="${x.id}">Revisar</button>${setB("moves",x.id,"okExtra","1","És correcte")}`})); });
+  // 16. Contractes acabats amb fiança: s'ha retornat?
+  allC.filter(c=>cStatus(c)==="acabat"&&c.tenantType!=="empresa"&&+c.deposit>0&&!c.depositUnpaid&&!c.depReturned&&c.end>=dShift(-400)).forEach(c=>{
+    if(vm.some(x=>x.type==="despesa"&&x.propId===c.propId&&(x.category==="Fiança"||/fian/.test(norm(x.concept)))&&x.date>=dShiftFrom(c.end,-30))) return;
+    out.push({k:"warn", chip:"Fiança", t:`<b>${pn(c.propId)}</b> · ${cname(c)}<div class="small muted">El contracte es va acabar el ${fmtDate(c.end)} i tenia ${eur(c.deposit)} de fiança. L'has tornada? Recorda recuperar-la de l'organisme oficial.</div>`,
+      act:`${setB("contracts",c.id,"depReturned","1","Ja està tornada",true)}`}); });
   return out;
+}
+const dShiftFrom = (d, days) => { const t=new Date(d+"T12:00:00"); t.setDate(t.getDate()+days); return t.toLocaleDateString("sv-SE"); };
+function chkNoDocs(pid){
+  const p=propById(pid); if(!p) return; const y0=today().slice(0,4);
+  const nd=VM().filter(x=>x.propId===pid&&x.type==="despesa"&&!x.docId&&!x.noDocOk&&isDate(x.date)&&x.date.slice(0,4)>=String(+y0-1)&&+x.amount>0).sort((a,b)=>b.date.localeCompare(a.date));
+  if(!nd.length){ checkData(); return; }
+  openSheet("Despeses sense factura", `<p class="muted">${esc(p.name)}: obre cada despesa i escaneja-hi la factura. Si no en tens, marca-la i no et tornaré a avisar.</p>
+    <ul class="todo">${nd.map(x=>`<li><span class="chip warn">${esc(x.category||"Despesa")}</span><div class="t"><b>${esc(x.concept||x.provider||x.category||"")}</b><div class="small muted">${fmtDate(x.date)} · <span class="num">${eur(x.amount)}</span></div></div><div class="act"><button class="btn sm primary" data-act="editMove" data-id="${x.id}">Afegir la factura</button><button class="btn sm" data-act="chkSet" data-id="moves|${x.id}|noDocOk|1|nodocs:${pid}">No en tinc</button></div></li>`).join("")}</ul>
+    <div class="actions"><button type="button" class="btn" data-act="checkData">Enrere</button></div>`);
 }
 function checkData(){
   const iss=dataIssues();
@@ -3771,7 +3841,11 @@ const ACT = {
   chkNotDup: async id => { try{ await db.doc("moves/"+id).update({notDup:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkPeriod: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; try{ await db.doc("moves/"+id).update({period:ymOf(x.date)}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkLink: async key => { const [id,cid]=key.split("|"); try{ await db.doc("moves/"+id).update({contractId:cid}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
-  chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"+id).update({okExtra:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+  chkSet: async key => { const [coll,id,field,val,back]=key.split("|"); try{ await db.doc(coll+"/"+id).update({[field]: val==="mo"?curMonth():val==="1"?true:val}); if(back&&back.startsWith("nodocs:")) chkNoDocs(back.slice(7)); else chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+chkGapOk: async key => { const [pid,ns]=key.split("|"), p=propById(pid); if(!p) return; try{ await db.doc("props/"+pid).update({invGapOk:[...new Set([...(p.invGapOk||[]), ...ns.split(",").map(Number)])]}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
+chkNoDocs: pid => chkNoDocs(pid),
+chkInv: pid => { ACT.openProp(pid); invForm(pid); },
+chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"+id).update({okExtra:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   chkFian: key => { const [id,v]=key.split("|"); const x=S.moves.find(m=>m.id===id); if(!x) return; const c=conById(x.contractId); const sug=+v, dep=(c&&+c.deposit>0)?+c.deposit:0;
     openSheet("Separar la fiança", `<div class="form"><p class="muted">${fmtDate(x.date)} · cobrament de ${eur(x.amount)}. Quina part era la fiança?</p><label class="field"><span>Import de la fiança</span><input id="chk-f" type="text" inputmode="decimal" value="${String(sug).replace(".",",")}"></label><p class="small muted">${dep?`Al contracte hi consta una fiança de ${eur(dep)}. `:""}Es restarà del lloguer i quedarà anotada com a fiança, que no compta com a ingrés.</p><div class="actions"><button type="button" class="btn ghost" data-act="checkData">Enrere</button><button type="button" class="btn primary" data-act="chkFianGo" data-id="${id}">Separar</button></div></div>`); },
   chkFianGo: id => chkFianGo(id),

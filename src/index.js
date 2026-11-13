@@ -230,7 +230,7 @@ async function dailyReminder(env){
 
 // ---------- pàgina d'entrada ----------
 const LOGIN_HTML = (msg = "") => `<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Els meus lloguers</title><script src="/i18n.js?v=3"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
+<title>Els meus lloguers</title><script src="/i18n.js?v=4"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#1B2A5C,#0B1430);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#E8EDFB;padding:24px}
 form{width:100%;max-width:340px;text-align:center}img{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 30px #0006}h1{font-size:22px;margin:18px 0 6px}p{margin:0 0 22px;color:#9FB0DD;font-size:14px}
 input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #33457f;background:#0E1838;color:#fff;font-size:16px;outline:none}input:focus{border-color:#FFC23D}
