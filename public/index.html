@@ -2691,7 +2691,7 @@ function fixedPanel(p){
   return `<section class="panel"><div class="panel-h"><div><h3>Despeses fixes de l'any</h3><p class="small muted" style="margin:2px 0 0">Les que ja saps que arribaran. Cada mes es resten del que et queda, fins que n'escanegis el rebut real.</p></div></div>
     ${its.length?`<ul class="fixl">${its.map((it,i)=>`<li><div class="t"><b>${esc(it.concept||it.category)}</b><div class="small muted">${FREQS[it.freq]||""}${it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><span class="num">${eur(it.amount)}</span><button type="button" class="ib" data-act="fixedEdit" data-id="${p.id}|${i}" title="Corregir" aria-label="Corregir ${esc(it.concept||it.category)}">${PENCIL}</button><button type="button" class="ib del" data-act="fixedDel" data-id="${p.id}|${i}" title="Treure" aria-label="Treure ${esc(it.concept||it.category)}">×</button></li>`).join("")}</ul>
       <div class="fixtot"><span>Total a l'any</span><b class="num">${eur(tot)}</b><span class="small muted">${eur(tot/12)}/mes de mitjana</span></div>`
-      :`<p class="small muted">Encara no n'hi ha cap. Pots afegir-les una a una o fer que les tregui dels moviments de l'any passat.</p>`}
+      :""}
     <div class="cact"><button class="btn sm primary" data-act="fixedEdit" data-id="${p.id}|new">Afegir</button><button class="btn sm" data-act="fixedSuggest" data-id="${p.id}">Treure-les de l'any passat</button></div></section>`;
 }
 function fixedForm(key){
