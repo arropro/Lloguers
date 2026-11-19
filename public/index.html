@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=10"></script>
+<script src="/i18n.js?v=11"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -1916,7 +1916,8 @@ function invShareOpen(src){
     <div class="gact col"><button class="btn primary" id="ish-send">✉️ Enviar per correu</button>
       ${mob?`<button type="button" class="btn" id="ish-wa"><span style="color:#25D366">●</span> Enviar per WhatsApp</button>`:""}
       <button type="button" class="btn" data-act="ishGo" data-id="dl">⬇️ Descarregar el PDF</button></div>
-    <p class="small muted" id="ish-st" style="margin:0"></p></form>`);
+    <p class="small muted" id="ish-st" style="margin:0"></p>
+    ${x&&!x.sentAt?`<p class="small" style="margin:0"><button type="button" class="linkbtn" data-act="invMarkSent" data-id="${x.id}">Ja l'he enviada d'una altra manera: arxivar-la</button></p>`:""}</form>`);
   const f=$("#f-ish"), st=$("#ish-st"), btn=$("#ish-send");
   const grab=()=>{ const fd=new FormData(f); Object.assign(INV_SH,{to:String(fd.get("to")||"").trim(), subj:String(fd.get("subj")||"").trim(), msg:String(fd.get("msg")||""), when:$("#ish-dt").style.display==="none"?"":String(fd.get("when")||"")}); };
   const label=()=>{ btn.textContent = !(INV_SH.cfg&&INV_SH.cfg.configured) ? "✉️ Connectar el Gmail i enviar" : $("#ish-dt").style.display==="none" ? "✉️ Enviar per correu" : "🕒 Programar l'enviament"; };
@@ -3979,6 +3980,7 @@ chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"
   invForm: id => invForm(id),
   invSendLast: () => { if(INV_LAST) invShareOpen({docId:INV_LAST.docId, fname:INV_LAST.fname, moveId:INV_LAST.moveId}); },
   ishGo: k => ishGo(k),
+  invMarkSent: async id => { const now=new Date().toISOString(); try{ await db.doc("moves/"+id).update({sentAt:now, sentTo:"", mailAt:null}); closeSheet(); toast("Arxivada a Enviades ✓"); }catch{ toast("No s'ha pogut desar."); } },
   invUnsched: async id => { try{ await db.doc("moves/"+id).update({mailAt:null}); toast("Enviament cancel·lat"); }catch{ toast("No s'ha pogut desar."); } },
   invSend: id => invSendMove(id),
   invDel: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; const p=propById(x.propId);
