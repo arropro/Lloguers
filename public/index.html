@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=7"></script>
+<script src="/i18n.js?v=8"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -1875,51 +1875,47 @@ async function invForm(pid){
   });
 }
 let INV_LAST=null;
-// Enviar una factura: WhatsApp, Gmail, correu, descarregar… (l'enllaç funciona 30 dies)
+// Enviar una factura: el PDF mateix (WhatsApp, Gmail… des del mòbil), descarregar-lo o obrir Gmail amb el missatge.
 let INV_SH=null;
+function invMsg(x, p){
+  const kind=x&&x.invKind==="Aigua"?"del agua":"de la luz", per=x&&(x.concept||"").match(/(\d{2}\/\d{2}\/\d{4})–(\d{2}\/\d{2}\/\d{4})/);
+  const who=(p&&p.inv&&p.inv.emName||"").trim().split(/\s+/)[0]||"";
+  return `Buenos días:\n\nOs adjunto la factura ${kind}${per?` correspondiente al periodo del ${per[1]} al ${per[2]}`:""}${x?`, por un importe de ${eur(x.amount)}`:""}.\n\nQuedo a vuestra disposición para cualquier consulta.\n\nUn saludo${who?",\n"+who:"."}`;
+}
 function invShareOpen(src){
-  const x=src.moveId?S.moves.find(m=>m.id===src.moveId):null, c=x&&x.contractId?conById(x.contractId):null;
+  const x=src.moveId?S.moves.find(m=>m.id===src.moveId):null, c=x&&x.contractId?conById(x.contractId):null, p=x?propById(x.propId):null;
   const fname=src.fname||(x&&x.docName)||"Factura.pdf";
-  const kind=x&&x.invKind==="Aigua"?"agua":"luz", per=x&&(x.concept||"").match(/(\d{2}\/\d{2}\/\d{4}–\d{2}\/\d{2}\/\d{4})/);
-  const msg=`Hola, os envío la factura${x&&x.invNo?" nº "+x.invNo:""} de ${kind}${per?" ("+per[1].replace("–"," - ")+")":""}${x?" por importe de "+eur(x.amount):""}. La podéis descargar aquí:`;
-  INV_SH={blob:src.blob||null, fname, url:"", to:(c&&c.email)||"", subj:fname.replace(/\.pdf$/i,"")};
+  const mob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
+  const canFiles=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[new File([new Blob(["x"],{type:"application/pdf"})],"a.pdf",{type:"application/pdf"})]}));
+  const kindT=x&&x.invKind==="Aigua"?"agua":"luz", per=x&&(x.concept||"").match(/\d{2}\/(\d{2})\/(\d{4})–/);
+  INV_SH={blob:src.blob||null, fname, to:(c&&c.email)||"", subj:`Factura ${kindT}${per?" "+["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][+per[1]-1]+" "+per[2]:""}`};
   openSheet("Enviar la factura", `<div class="form">
-    <label class="field"><span>Missatge</span><textarea id="ish-msg" rows="3" data-notr>${esc(msg)}</textarea></label>
-    <p class="small muted" id="ish-st">Preparant l'enllaç de la factura…</p>
-    <div class="shgrid">
-      <button type="button" class="shb" data-act="ishGo" data-id="wa" disabled><span class="shi" style="background:#25D366">${SH_IC.wa}</span>WhatsApp</button>
-      <button type="button" class="shb" data-act="ishGo" data-id="gm" disabled><span class="shi" style="background:#fff;box-shadow:inset 0 0 0 1px #e3e7ef">${SH_IC.gm}</span>Gmail</button>
-      <button type="button" class="shb" data-act="ishGo" data-id="ml" disabled><span class="shi" style="background:#2F5BEA">${SH_IC.ml}</span>Correu</button>
-      <button type="button" class="shb" data-act="ishGo" data-id="cp" disabled><span class="shi" style="background:#64748b">${SH_IC.cp}</span>Copiar l'enllaç</button>
-      <button type="button" class="shb" data-act="ishGo" data-id="dl" disabled><span class="shi" style="background:#0B1430">${SH_IC.dl}</span>Descarregar</button>
-      ${navigator.share?`<button type="button" class="shb" data-act="ishGo" data-id="more" disabled><span class="shi" style="background:#94a3b8">${SH_IC.more}</span>Més opcions</button>`:""}
+    <label class="field"><span>Missatge (es copia sol perquè l'enganxis)</span><textarea id="ish-msg" rows="7" data-notr>${esc(invMsg(x,p))}</textarea></label>
+    <p class="small muted" id="ish-st">Preparant el PDF…</p>
+    <div class="gact col">
+      ${mob&&canFiles?`<button type="button" class="btn primary" data-act="ishGo" data-id="share" disabled>📤 Enviar el PDF (WhatsApp, Gmail…)</button>`:""}
+      ${!mob?`<button type="button" class="btn primary" data-act="ishGo" data-id="gm" disabled>✉️ Preparar el correu a Gmail</button>`:""}
+      ${!mob&&canFiles?`<button type="button" class="btn" data-act="ishGo" data-id="share" disabled>📤 Enviar el PDF amb Mail, Missatges…</button>`:""}
+      <button type="button" class="btn" data-act="ishGo" data-id="dl" disabled>⬇️ Descarregar el PDF</button>
     </div>
+    <p class="small muted" style="margin:2px 0 0">${mob?"Toca «Enviar el PDF» i tria WhatsApp, Gmail o l'app que vulguis: hi anirà la factura com a PDF. El missatge ja està copiat: només l'has d'enganxar.":"Gmail no deixa que una web hi enganxi fitxers: es descarregarà el PDF i s'obrirà el correu amb l'assumpte i el missatge escrits. Només hauràs d'arrossegar-hi el PDF (o tocar el clip i triar-lo a Baixades)."}</p>
     <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Tancar</button></div></div>`);
   (async()=>{ try{
     if(!INV_SH.blob){ const r=await fetch("/_blob/"+x.docId,{credentials:"same-origin"}); if(!r.ok) throw 0; INV_SH.blob=await r.blob(); }
-    const url=await uploadLink(INV_SH.blob, fname, "application/pdf", null, 30); if(!url) throw 0; INV_SH.url=url;
-    const st=document.getElementById("ish-st"); if(st) st.textContent="Tria per on la vols enviar. L'enllaç funciona 30 dies.";
+    INV_SH.file=new File([INV_SH.blob], fname, {type:"application/pdf"});
+    const st=document.getElementById("ish-st"); if(st) st.textContent="Factura a punt.";
     document.querySelectorAll('[data-act="ishGo"]').forEach(b=>b.disabled=false);
-  }catch{ const st=document.getElementById("ish-st"); if(st) st.textContent="No s'ha pogut preparar l'enllaç. Comprova la connexió i torna-ho a provar."; } })();
+  }catch{ const st=document.getElementById("ish-st"); if(st) st.textContent="No s'ha pogut obrir la factura. Comprova la connexió i torna-ho a provar."; } })();
 }
-const SH_IC={
-  wa:'<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2a8.2 8.2 0 01-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 01-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 00-.7.3 3 3 0 00-.9 2.2 5.2 5.2 0 001.1 2.8 11.9 11.9 0 004.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>',
-  gm:'<svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 6.5V18a1 1 0 001 1h3V10l5 3.8 5-3.8v9h3a1 1 0 001-1V6.5L12 13z" fill="#EA4335"/><path d="M3 6.5L12 13l9-6.5-1.6-1.2L12 10.8 4.6 5.3z" fill="#C5221F"/><path d="M17 19h3a1 1 0 001-1V6.5l-4 3z" fill="#34A853"/><path d="M3 6.5V18a1 1 0 001 1h3V9.5z" fill="#4285F4"/></svg>',
-  ml:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
-  cp:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
-  dl:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
-  more:'<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'
-};
-function ishGo(k){ const S2=INV_SH; if(!S2||!S2.url) return; const m=(document.getElementById("ish-msg")||{}).value||"", body=m+"\n"+S2.url;
-  if(k==="wa") window.open("https://wa.me/?text="+encodeURIComponent(body),"_blank","noopener");
-  else if(k==="gm") window.open("https://mail.google.com/mail/?view=cm&fs=1"+(S2.to?"&to="+encodeURIComponent(S2.to):"")+"&su="+encodeURIComponent(S2.subj)+"&body="+encodeURIComponent(body),"_blank","noopener");
-  else if(k==="ml") location.href="mailto:"+encodeURIComponent(S2.to)+"?subject="+encodeURIComponent(S2.subj)+"&body="+encodeURIComponent(body);
-  else if(k==="cp"){ (navigator.clipboard?navigator.clipboard.writeText(body):Promise.reject()).then(()=>toast("Enllaç copiat"),()=>prompt("Copia l'enllaç:",S2.url)); }
-  else if(k==="dl"){ const a=document.createElement("a"); a.href=URL.createObjectURL(S2.blob); a.download=S2.fname; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },2000); }
-  else if(k==="more"){ const file=new File([S2.blob], S2.fname, {type:"application/pdf"});
-    const data=navigator.canShare&&navigator.canShare({files:[file]})?{files:[file], title:S2.fname, text:m}:{title:S2.fname, text:m, url:S2.url};
-    navigator.share(data).catch(()=>{}); }
+function ishCopy(){ const m=(document.getElementById("ish-msg")||{}).value||""; try{ navigator.clipboard&&navigator.clipboard.writeText(m).catch(()=>{}); }catch{} return m; }
+function ishDownload(){ const S2=INV_SH, a=document.createElement("a"); a.href=URL.createObjectURL(S2.blob); a.download=S2.fname; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },3000); }
+function ishGo(k){ const S2=INV_SH; if(!S2||!S2.blob) return;
+  if(k==="share"){ const m=ishCopy(); navigator.share({files:[S2.file]}).then(()=>{},e=>{ if(e&&e.name!=="AbortError") toast("No s'ha pogut obrir. Prova «Descarregar el PDF»."); }); if(m) toast("Missatge copiat: enganxa'l després del PDF"); }
+  else if(k==="gm"){ const m=ishCopy(); ishDownload();
+    window.open("https://mail.google.com/mail/?view=cm&fs=1"+(S2.to?"&to="+encodeURIComponent(S2.to):"")+"&su="+encodeURIComponent(S2.subj)+"&body="+encodeURIComponent(m),"_blank","noopener"); }
+  else if(k==="dl"){ ishDownload(); toast("Factura descarregada"); }
 }
+const SH_IC={};
 async function invShare(blob, fname){ invShareOpen({blob, fname, moveId:INV_LAST&&INV_LAST.blob===blob?INV_LAST.moveId:null}); }
 function invSendMove(id){ const x=S.moves.find(m=>m.id===id); if(!x||!x.docId) return; invShareOpen({moveId:id}); }
 // PDF senzill fet a mà (sense llibreries): text Helvetica, línies i colors. Així funciona sempre, fins i tot sense internet.
@@ -2821,7 +2817,7 @@ function fixedPending(p, mo){
 function fixedPanel(p){
   const its=p.fixed||[], tot=its.reduce((a,it)=>a+fixedYear(it),0);
   return `<section class="panel"><div class="panel-h"><div><h3>Despeses fixes de l'any</h3><p class="small muted" style="margin:2px 0 0">Les que ja saps que arribaran. Cada mes es resten del que et queda, fins que n'escanegis el rebut real.</p></div></div>
-    ${its.some(it=>!(it.freq==="once"&&it.ym<curMonth()))?`<ul class="fixl">${its.map((it,i)=>it.freq==="once"&&it.ym<curMonth()?"":`<li><div class="t"><b>${esc(it.concept||it.category)}</b><div class="small muted">${FREQS[it.freq]||""}${it.freq==="once"?" · "+monthLabel(it.ym):it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><span class="num">${eur(it.amount)}</span><button type="button" class="ib" data-act="fixedEdit" data-id="${p.id}|${i}" title="Corregir" aria-label="Corregir ${esc(it.concept||it.category)}">${PENCIL}</button><button type="button" class="ib del" data-act="fixedDel" data-id="${p.id}|${i}" title="Treure" aria-label="Treure ${esc(it.concept||it.category)}">×</button></li>`).join("")}</ul>
+    ${its.some(it=>!(it.freq==="once"&&it.ym<curMonth()))?`<ul class="fixl">${its.map((it,i)=>it.freq==="once"&&it.ym<curMonth()?"":`<li><div class="t"><b>${esc(it.concept||it.category)}</b><div class="small muted">${FREQS[it.freq]||""}${it.freq==="once"?" · "+monthLabel(it.ym):it.freq!=="mensual"?" · "+fixedMonths(it).map(n=>MONTHS_CA[n-1].slice(0,3)).join(", "):""}</div></div><span class="num">${eur(it.amount)}</span><button type="button" class="ib" data-act="fixedEdit" data-id="${p.id}|${i}" title="Corregir" aria-label="Corregir ${esc(it.concept||it.category)}">${PENCIL}</button><button type="button" class="ib del" data-act="fixedDel" data-id="${p.id}|${i}" title="Esborrar aquesta despesa prevista" aria-label="Esborrar ${esc(it.concept||it.category)}" data-confirm="Esborrar?"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></li>`).join("")}</ul>
       <div class="fixtot"><span>Total a l'any</span><b class="num">${eur(tot)}</b><span class="small muted">${eur(tot/12)}/mes de mitjana</span></div>`
       :""}
     <div class="cact"><button class="btn sm primary" data-act="fixedEdit" data-id="${p.id}|new">Afegir</button><button class="btn sm" data-act="fixedSuggest" data-id="${p.id}">Treure-les de l'any passat</button></div></section>`;
