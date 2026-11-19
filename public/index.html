@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=5"></script>
+<script src="/i18n.js?v=6"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -800,6 +800,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .invl li > span{flex:1;min-width:0}
 .btn.danger{color:var(--out)}
 .linkbtn.del{text-decoration:none;opacity:.7}
+.shgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}.shb{font:inherit;font-size:.8rem;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 4px 10px;display:grid;justify-items:center;gap:7px;cursor:pointer}.shb:disabled{opacity:.45;cursor:default}.shb .shi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
 .penbtn{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;background:var(--surface);color:var(--ink);border:1px solid var(--line);transition:background .15s,transform .15s}
 .penbtn svg{width:18px;height:18px}
 .penbtn:hover{background:color-mix(in srgb,var(--ink) 6%,var(--surface));transform:translateY(-1px)}
@@ -1048,7 +1049,7 @@ function metrics(p){
   const ms=movesOf(p.id), d365=dShift(-365), cur=current(p.id), cm=curMonth();
   let rentM=sum(cur, c=>split(c).net), annual=rentM*12;
   if(isEmp(p)&&ms.some(m=>m.type==="ingres"&&m.category==="Lloguer"&&m.date>=d365)){ const inc=ms.filter(m=>m.type==="ingres"&&m.category==="Lloguer"&&m.date>=d365); const first=inc.map(m=>m.date).sort()[0]; const span=first?Math.min(12,Math.max(1,Math.round(daysBetween(first,today())/30.44)+1)):12; annual=sum(inc)/span*12; rentM=annual/12; }
-  const exp12=sum(ms.filter(m=>m.type==="despesa" && !INVEST.includes(m.category) && m.date>=d365));
+  const exp12=sum(ms.filter(m=>m.type==="despesa" && !INVEST.includes(m.category) && !passThru(m) && m.date>=d365));
   const invExtra=sum(ms.filter(m=>m.type==="despesa" && INVEST.includes(m.category)));
   const invest=(Number(p.price)||0)+invExtra;
   const since=p.purchaseDate || ms.map(m=>m.date).sort()[0] || today();
@@ -1318,7 +1319,7 @@ function viewResum(){
     <div class="askpills">${askRent.map(c=>`<span class="apill"><span><b>${esc(propById(c.propId).name)}</b> <span class="num">${eur(split(c,m).net)}</span></span><button class="ok" data-act="quickPaid" data-id="${c.id}|${m}" title="Cobrat" aria-label="Cobrat ${esc(propById(c.propId).name)}">✓</button><button class="no" data-act="payMonth" data-id="${c.id}|${m}" title="Encara no" aria-label="Encara no">···</button></span>`).join("")}${askRent.length>1?`<button class="btn sm primary" data-act="allPaidMonth">Sí, tots</button>`:""}</div></section>` : "";
   return `<section class="hero hero2" aria-label="Aquest mes">
     <div style="position:relative">
-      ${(()=>{ const fixP=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+fixP, othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança")), anyFee=cur.some(c=>+c.feePct>0);
+      ${(()=>{ const fixP=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const outOp=sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"&&!passThru(x)))+fixP, othInc=sum(mm.filter(x=>x.type==="ingres"&&x.category!=="Lloguer"&&x.category!=="Fiança"&&!passThru(x))), anyFee=cur.some(c=>+c.feePct>0);
         const fl=Math.round((expected+othInc-outOp-hip)*100)/100;
         return `<div class="htop"><span class="eyebrow">${monthName(m)} ${m.slice(0,4)}</span>${todo.length?`<a class="hchip" href="#per-revisar" data-act="goTodo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg>${todo.length} avís${todo.length===1?"":"os"}</a>`:`<span class="hchip ok">Tot en ordre</span>`}<button type="button" class="eyeb" data-act="privToggle" aria-pressed="${document.body.classList.contains("priv")}" title="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}" aria-label="${document.body.classList.contains("priv")?"Mostrar els imports":"Amagar els imports"}">${document.body.classList.contains("priv")?EYE_OFF:EYE_ON}</button></div>
       <div class="bigl">Aquest mes et quedaran</div>
@@ -1331,7 +1332,7 @@ function viewResum(){
     <div class="hstats">
       <div><span class="label">Lloguers del mes</span><span class="num">${eur(expected)}</span><small>${cur.length} contracte${cur.length===1?"":"s"}${cur.some(c=>+c.feePct>0)?" · nets de comissió":""}</small></div>
       <div><span class="label">Lloguers cobrats</span><span class="num">${eur(cobrat)}</span><span class="hbar"><i style="width:${expected?Math.min(100,Math.round(cobrat/expected*100)):0}%"></i></span></div>
-      <div><span class="label">Despeses i hipoteca</span><span class="num">${eur(sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"))+sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0)+hip)}</span><small>${(()=>{ const fx=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const ex=sum(mm.filter(x=>x.type==="despesa"&&INVEST.includes(x.category))); const d=sum(mm.filter(x=>x.type==="despesa"&&x.category==="Derrama")); return [hip?`hipoteca ${eur(hip)}`:"sense hipoteca", fx?`previstes ${eur(fx)}`:"", ex?(d===ex?`derrama ${eur(d)}`:`extraordinàries ${eur(ex)}`):""].filter(Boolean).join(" · "); })()}</small></div>
+      <div><span class="label">Despeses i hipoteca</span><span class="num">${eur(sum(mm.filter(x=>x.type==="despesa"&&x.category!=="Comissió plataforma"&&!passThru(x)))+sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0)+hip)}</span><small>${(()=>{ const fx=sortedProps().reduce((a,p)=>a+sum(fixedPending(p,m),it=>+it.amount||0),0); const ex=sum(mm.filter(x=>x.type==="despesa"&&INVEST.includes(x.category))); const d=sum(mm.filter(x=>x.type==="despesa"&&x.category==="Derrama")); return [hip?`hipoteca ${eur(hip)}`:"sense hipoteca", fx?`previstes ${eur(fx)}`:"", ex?(d===ex?`derrama ${eur(d)}`:`extraordinàries ${eur(ex)}`):""].filter(Boolean).join(" · "); })()}</small></div>
     </div>
   </section>
   <section class="panel">
@@ -1360,7 +1361,7 @@ function hipFor(props, y){
   return sum(props, p=>{ const M=mtg(p); return M?mtgSum(M,a,b,"pay"):0; });
 }
 function moneyLine(list, hip, lead){
-  const inc=sum(list.filter(x=>x.type==="ingres"&&x.category!=="Fiança")), out=sum(list.filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra"));
+  const inc=sum(list.filter(x=>x.type==="ingres"&&x.category!=="Fiança"&&!passThru(x))), out=sum(list.filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra"&&!passThru(x)));
   return `<div class="totals mline">${lead?`<span class="tlead">${lead}</span>`:""}<span class="${hip?"tinc":""}"><small>Ingressos</small><b class="num pos">${eur(inc)}</b></span><span><small>Despeses</small><b class="num neg">${eur(out)}</b></span>${hip?`<span><small>Hipoteca</small><b class="num neg">${eur(hip)}</b></span>`:""}<span class="brk"></span><span class="netpill" title="No compta les fiances ni les despeses de compra (notari, impostos…), però sí la hipoteca"><span class="ni"><img src="/sac.png?v=3" alt=""></span><span class="nt">Net a la butxaca</span><b class="num">${eur(inc-out-hip)}</b></span></div>`;
 }
 function yearLine(vm){
@@ -1393,10 +1394,10 @@ const eur0 = n => Math.round(Number(n)||0).toLocaleString("ca-ES")+" €";
 const shortProp = n => String(n||"").replace(/^pis\s+/i,"").replace(/\s*\(.*?\)\s*$/,"");
 function flatSeries(p){
   const end=addMonths(curMonth(),-1), months=[]; for(let i=11;i>=0;i--) months.push(addMonths(end,-i));
-  const ms=movesOf(p.id).filter(x=>x.type==="ingres"&&x.category!=="Fiança");
+  const ms=movesOf(p.id).filter(x=>x.type==="ingres"&&x.category!=="Fiança"&&!passThru(x));
   const a=months.map(m=>sum(ms.filter(x=>movePeriod(x)===m)));   // per mes al qual correspon el lloguer, no pel dia que es cobra
   const l3=a[9]+a[10]+a[11], p3=a[6]+a[7]+a[8], M=mtg(p);
-  const ds=movesOf(p.id).filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra");
+  const ds=movesOf(p.id).filter(x=>x.type==="despesa"&&x.category!=="Despeses de compra"&&!passThru(x));
   const b=months.map(m=>sum(ds.filter(x=>ymOf(x.date)===m))+(M?mtgPay(M,m):0));
   return {a, b, out:sum(b,x=>x), months, end, tot:sum(a,x=>x), t: p3 ? Math.round((l3-p3)/p3*100) : null};
 }
@@ -1464,7 +1465,7 @@ function emptyStart(){
 }
 
 /* ---------- Pisos ---------- */
-function earned(p, y){ const ms=movesOf(p.id).filter(m=>!y||String(m.date).startsWith(String(y))), inc=sum(ms.filter(m=>m.type==="ingres"&&m.category!=="Fiança")), out=sum(ms.filter(m=>m.type==="despesa"&&m.category!=="Despeses de compra")); const M=mtg(p), int=M?mtgSum(M, y?String(y)+"-01":M.start, curMonth(), "int"):0; return Math.round((inc-out-int)*100)/100; }
+function earned(p, y){ const ms=movesOf(p.id).filter(m=>!y||String(m.date).startsWith(String(y))), inc=sum(ms.filter(m=>m.type==="ingres"&&m.category!=="Fiança"&&!passThru(m))), out=sum(ms.filter(m=>m.type==="despesa"&&m.category!=="Despeses de compra"&&!passThru(m))); const M=mtg(p), int=M?mtgSum(M, y?String(y)+"-01":M.start, curMonth(), "int"):0; return Math.round((inc-out-int)*100)/100; }
 function viewProps(){
   if (!S.props.length) return emptyStart();
   const m=curMonth();
@@ -1743,13 +1744,13 @@ async function gestorBuild(y, pids){
 let GESTOR_FILE=null, GESTOR_LINK="";
 // Al mòbil, el fitxer es puja al teu servidor i en surt un enllaç (caduca en 24 h) que pots enviar al gestor,
 // copiar o obrir en qualsevol navegador. Les descàrregues fetes des de l'app Android les passava a una altra app.
-async function uploadLink(blob, name, type, btn){
+async function uploadLink(blob, name, type, btn, days){
   const id=[...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,"0")).join(""), CH=20*1024*1024, parts=Math.max(1,Math.ceil(blob.size/CH));
   const lbl=btn&&btn.innerHTML;
   try{
     for(let i=0;i<parts;i++){ if(btn) btn.innerHTML=`Preparant… ${Math.round(i/parts*100)}%`;
-      const r=await fetch(`/api/dl/part?id=${id}&n=${i}`,{method:"POST",credentials:"same-origin",body:blob.slice(i*CH,(i+1)*CH)}); if(!r.ok) throw new Error("part"); }
-    const d=await (await fetch("/api/dl/done",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({id,parts,name,type,size:blob.size})})).json();
+      const r=await fetch(`/api/dl/part?id=${id}&n=${i}${days?"&days="+days:""}`,{method:"POST",credentials:"same-origin",body:blob.slice(i*CH,(i+1)*CH)}); if(!r.ok) throw new Error("part"); }
+    const d=await (await fetch("/api/dl/done",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({id,parts,name,type,size:blob.size,days:days||1})})).json();
     return location.origin+d.url;
   }catch{ toast("No s'ha pogut preparar l'enllaç. Torna-ho a provar."); return ""; }
   finally{ if(btn) btn.innerHTML=lbl; }
@@ -1758,6 +1759,21 @@ async function uploadLink(blob, name, type, btn){
 const EMPCOL=["#2F5BEA","#E0A526","#1F9D6B","#B05FD8","#E0573A","#2BA3B8"];
 /* ================= Factures de llum i aigua (pisos per a empreses) ================= */
 const INV_CAT="Subministraments refacturats";
+// Llum i aigua refacturades a l'empresa: no són ni ingrés ni despesa (pagues la factura i l'empresa te la torna).
+// No compten la factura que fas a l'empresa ni la factura de llum/aigua que ja li has refacturat.
+let PASS_CACHE={src:null,len:-1,set:null};
+function utilKindOf(x){ const t=norm([x.concept,x.provider,x.docName].join(" ")); if(/\b(llum|luz|electric|endesa|iberdrola|naturgy|energia|holaluz|octopus|totalenergies|som energia)/.test(t)) return "Llum"; if(/\b(aigua|agua|aigues|aguas|aqualia|ematsa|sorea|canal)/.test(t)) return "Aigua"; return ""; }
+function passThru(x){
+  if(x.category===INV_CAT) return true;
+  if(x.type!=="despesa"||x.category!=="Subministraments") return false;
+  if(PASS_CACHE.src!==S.moves||PASS_CACHE.len!==S.moves.length){ const set=new Set();
+    S.moves.filter(m=>m.category===INV_CAT).forEach(f=>{ const k=f.invKind||""; let best=null;
+      S.moves.forEach(b=>{ if(b.propId!==f.propId||b.type!=="despesa"||b.category!=="Subministraments"||b.noRebill||set.has(b.id)||!isDate(b.date)||b.date>f.date||utilKindOf(b)!==k) return; if(!best||b.date>best.date) best=b; });
+      if(best) set.add(best.id); });
+    PASS_CACHE={src:S.moves,len:S.moves.length,set}; }
+  return PASS_CACHE.set.has(x.id);
+}
+
 const dmy = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; };
 const eurInv = v => (Math.round(v*100)/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2});
 function invList(p){ return movesOf(p.id).filter(x=>x.category===INV_CAT).sort((a,b)=>String(b.date).localeCompare(a.date)); }
@@ -1843,23 +1859,60 @@ async function invForm(pid){
       await db.doc("props/"+pid).update({inv:{...I, next:nn, pl1:d.pl1, pl2:d.pl2, emName:d.emName, emNif:d.emNif, emAddr:d.emAddr, lastTo:d.to}});
       if(d.caddr!==(c.tenantAddress||"")) await db.doc("contracts/"+c.id).update({tenantAddress:d.caddr});
       INV_LAST={blob, fname, docId:r.id, moveId:ref.id};
-      openSheet("Factura feta ✓", `<div class="form"><p>Factura <b>${esc(d.no)}</b> de ${kindCa.toLowerCase()} per a ${esc(d.cname)}: <b>${eur(amt)}</b>. Ja és als documents del pis i compta com a ingrés.</p>
+      openSheet("Factura feta ✓", `<div class="form"><p>Factura <b>${esc(d.no)}</b> de ${kindCa.toLowerCase()} per a ${esc(d.cname)}: <b>${eur(amt)}</b>. Ja és als documents del pis. No compta ni com a ingrés ni com a despesa: només és la llum o l'aigua que l'empresa et torna.</p>
         <div class="gact col"><button type="button" class="btn primary" data-act="invSendLast">📤 Enviar la factura</button><a class="btn" href="/_blob/${esc(r.id)}" target="_blank" rel="noopener">👁 Veure-la</a><button type="button" class="btn ghost danger" data-act="invDel" data-id="${ref.id}" data-confirm="Toca un altre cop per esborrar-la">🗑 Esborrar-la</button></div>
         <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Tancar</button></div></div>`);
     }catch(e){ console.warn(e); toast("No s'ha pogut fer la factura. Torna-ho a provar."); b.disabled=false; b.textContent="Fer la factura"; }
   });
 }
 let INV_LAST=null;
-async function invShare(blob, fname){
-  const file=new File([blob], fname, {type:"application/pdf"});
-  if(navigator.canShare && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file], title:fname}); }catch{} return; }
-  const url=await uploadLink(blob, fname, "application/pdf");
-  if(!url) return;
-  if(navigator.share){ try{ await navigator.share({title:fname, url}); }catch{} return; }
-  await downloadsCap.save({filename:fname, data:blob});
+// Enviar una factura: WhatsApp, Gmail, correu, descarregar… (l'enllaç funciona 30 dies)
+let INV_SH=null;
+function invShareOpen(src){
+  const x=src.moveId?S.moves.find(m=>m.id===src.moveId):null, c=x&&x.contractId?conById(x.contractId):null;
+  const fname=src.fname||(x&&x.docName)||"Factura.pdf";
+  const kind=x&&x.invKind==="Aigua"?"agua":"luz", per=x&&(x.concept||"").match(/(\d{2}\/\d{2}\/\d{4}–\d{2}\/\d{2}\/\d{4})/);
+  const msg=`Hola, os envío la factura${x&&x.invNo?" nº "+x.invNo:""} de ${kind}${per?" ("+per[1].replace("–"," - ")+")":""}${x?" por importe de "+eur(x.amount):""}. La podéis descargar aquí:`;
+  INV_SH={blob:src.blob||null, fname, url:"", to:(c&&c.email)||"", subj:fname.replace(/\.pdf$/i,"")};
+  openSheet("Enviar la factura", `<div class="form">
+    <label class="field"><span>Missatge</span><textarea id="ish-msg" rows="3" data-notr>${esc(msg)}</textarea></label>
+    <p class="small muted" id="ish-st">Preparant l'enllaç de la factura…</p>
+    <div class="shgrid">
+      <button type="button" class="shb" data-act="ishGo" data-id="wa" disabled><span class="shi" style="background:#25D366">${SH_IC.wa}</span>WhatsApp</button>
+      <button type="button" class="shb" data-act="ishGo" data-id="gm" disabled><span class="shi" style="background:#fff;box-shadow:inset 0 0 0 1px #e3e7ef">${SH_IC.gm}</span>Gmail</button>
+      <button type="button" class="shb" data-act="ishGo" data-id="ml" disabled><span class="shi" style="background:#2F5BEA">${SH_IC.ml}</span>Correu</button>
+      <button type="button" class="shb" data-act="ishGo" data-id="cp" disabled><span class="shi" style="background:#64748b">${SH_IC.cp}</span>Copiar l'enllaç</button>
+      <button type="button" class="shb" data-act="ishGo" data-id="dl" disabled><span class="shi" style="background:#0B1430">${SH_IC.dl}</span>Descarregar</button>
+      ${navigator.share?`<button type="button" class="shb" data-act="ishGo" data-id="more" disabled><span class="shi" style="background:#94a3b8">${SH_IC.more}</span>Més opcions</button>`:""}
+    </div>
+    <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Tancar</button></div></div>`);
+  (async()=>{ try{
+    if(!INV_SH.blob){ const r=await fetch("/_blob/"+x.docId,{credentials:"same-origin"}); if(!r.ok) throw 0; INV_SH.blob=await r.blob(); }
+    const url=await uploadLink(INV_SH.blob, fname, "application/pdf", null, 30); if(!url) throw 0; INV_SH.url=url;
+    const st=document.getElementById("ish-st"); if(st) st.textContent="Tria per on la vols enviar. L'enllaç funciona 30 dies.";
+    document.querySelectorAll('[data-act="ishGo"]').forEach(b=>b.disabled=false);
+  }catch{ const st=document.getElementById("ish-st"); if(st) st.textContent="No s'ha pogut preparar l'enllaç. Comprova la connexió i torna-ho a provar."; } })();
 }
-async function invSendMove(id){ const x=S.moves.find(m=>m.id===id); if(!x||!x.docId) return;
-  try{ const blob=await (await fetch("/_blob/"+x.docId,{credentials:"same-origin"})).blob(); await invShare(blob, x.docName||"Factura.pdf"); }catch{ toast("No s'ha pogut obrir la factura."); } }
+const SH_IC={
+  wa:'<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2a8.2 8.2 0 01-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 01-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 00-.7.3 3 3 0 00-.9 2.2 5.2 5.2 0 001.1 2.8 11.9 11.9 0 004.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>',
+  gm:'<svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 6.5V18a1 1 0 001 1h3V10l5 3.8 5-3.8v9h3a1 1 0 001-1V6.5L12 13z" fill="#EA4335"/><path d="M3 6.5L12 13l9-6.5-1.6-1.2L12 10.8 4.6 5.3z" fill="#C5221F"/><path d="M17 19h3a1 1 0 001-1V6.5l-4 3z" fill="#34A853"/><path d="M3 6.5V18a1 1 0 001 1h3V9.5z" fill="#4285F4"/></svg>',
+  ml:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+  cp:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
+  dl:'<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  more:'<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'
+};
+function ishGo(k){ const S2=INV_SH; if(!S2||!S2.url) return; const m=(document.getElementById("ish-msg")||{}).value||"", body=m+"\n"+S2.url;
+  if(k==="wa") window.open("https://wa.me/?text="+encodeURIComponent(body),"_blank","noopener");
+  else if(k==="gm") window.open("https://mail.google.com/mail/?view=cm&fs=1"+(S2.to?"&to="+encodeURIComponent(S2.to):"")+"&su="+encodeURIComponent(S2.subj)+"&body="+encodeURIComponent(body),"_blank","noopener");
+  else if(k==="ml") location.href="mailto:"+encodeURIComponent(S2.to)+"?subject="+encodeURIComponent(S2.subj)+"&body="+encodeURIComponent(body);
+  else if(k==="cp"){ (navigator.clipboard?navigator.clipboard.writeText(body):Promise.reject()).then(()=>toast("Enllaç copiat"),()=>prompt("Copia l'enllaç:",S2.url)); }
+  else if(k==="dl"){ const a=document.createElement("a"); a.href=URL.createObjectURL(S2.blob); a.download=S2.fname; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },2000); }
+  else if(k==="more"){ const file=new File([S2.blob], S2.fname, {type:"application/pdf"});
+    const data=navigator.canShare&&navigator.canShare({files:[file]})?{files:[file], title:S2.fname, text:m}:{title:S2.fname, text:m, url:S2.url};
+    navigator.share(data).catch(()=>{}); }
+}
+async function invShare(blob, fname){ invShareOpen({blob, fname, moveId:INV_LAST&&INV_LAST.blob===blob?INV_LAST.moveId:null}); }
+function invSendMove(id){ const x=S.moves.find(m=>m.id===id); if(!x||!x.docId) return; invShareOpen({moveId:id}); }
 // PDF senzill fet a mà (sense llibreries): text Helvetica, línies i colors. Així funciona sempre, fins i tot sense internet.
 const HW={n:"278 278 355 556 556 889 667 191 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 278 278 584 584 584 556 1015 667 667 722 722 667 611 778 722 278 500 667 556 833 722 778 667 778 722 667 611 722 667 944 667 667 611 278 278 278 469 556 333 556 556 500 556 556 278 556 556 222 222 500 222 833 556 556 556 556 333 500 278 556 500 722 500 500 500 334 260 334 584",
   b:"278 333 474 556 556 889 722 238 333 333 389 584 278 333 278 278 556 556 556 556 556 556 556 556 556 556 333 333 584 584 584 611 975 722 722 722 722 667 611 778 722 278 556 722 611 833 722 778 667 778 722 667 611 722 667 944 667 667 611 333 278 333 584 556 333 556 611 556 611 556 333 611 611 278 278 556 278 889 611 611 611 611 389 556 333 611 556 778 556 556 500 389 280 389 584"};
@@ -3853,7 +3906,8 @@ chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"
   chkDep: id => chkDep(id),
   chkDepNone: async id => { try{ await db.doc("contracts/"+id).update({depositNone:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   invForm: id => invForm(id),
-  invSendLast: () => { if(INV_LAST) invShare(INV_LAST.blob, INV_LAST.fname); },
+  invSendLast: () => { if(INV_LAST) invShareOpen({blob:INV_LAST.blob, fname:INV_LAST.fname, moveId:INV_LAST.moveId}); },
+  ishGo: k => ishGo(k),
   invSend: id => invSendMove(id),
   invDel: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; const p=propById(x.propId);
     try{ await db.doc("moves/"+id).delete(); if(x.docId) assets.delete(x.docId).catch(()=>{});

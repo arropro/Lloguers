@@ -230,7 +230,7 @@ async function dailyReminder(env){
 
 // ---------- pàgina d'entrada ----------
 const LOGIN_HTML = (msg = "") => `<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Els meus lloguers</title><script src="/i18n.js?v=5"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
+<title>Els meus lloguers</title><script src="/i18n.js?v=6"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#1B2A5C,#0B1430);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#E8EDFB;padding:24px}
 form{width:100%;max-width:340px;text-align:center}img{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 30px #0006}h1{font-size:22px;margin:18px 0 6px}p{margin:0 0 22px;color:#9FB0DD;font-size:14px}
 input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #33457f;background:#0E1838;color:#fff;font-size:16px;outline:none}input:focus{border-color:#FFC23D}
@@ -408,7 +408,7 @@ export default {
           await writable.close();
         })().catch(e => writable.abort(e));
         if (ctx && ctx.waitUntil) ctx.waitUntil(pump);
-        const h = { "content-type": meta.type, "content-disposition": `attachment; filename="${meta.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(meta.name)}`, "cache-control": "no-store" };
+        const h = { "content-type": meta.type, "content-disposition": `${meta.type === "application/pdf" ? "inline" : "attachment"}; filename="${meta.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(meta.name)}`, "cache-control": "no-store" };
         if (meta.size) h["content-length"] = String(meta.size);
         return new Response(readable, { headers: h });
       }
@@ -427,14 +427,16 @@ export default {
         const id = url.searchParams.get("id"), n = Number(url.searchParams.get("n"));
         const len = Number(request.headers.get("content-length") || 0);
         if (!validId(id) || !(n >= 0 && n < 50) || !len || len > 24 * 1024 * 1024) return err("invalid_request", 400);
-        await env.BLOBS.put(`t:${id}:${n}`, request.body, { expirationTtl: 86400 });
+        const days = Math.min(30, Math.max(1, Number(url.searchParams.get("days")) || 1));
+        await env.BLOBS.put(`t:${id}:${n}`, request.body, { expirationTtl: 86400 * days });
         return json({ ok: true });
       }
       if (p === "/api/dl/done" && request.method === "POST") {
         const b = await request.json().catch(() => ({}));
         if (!validId(b.id) || b.id.length < 24 || !(b.parts > 0 && b.parts <= 50)) return err("invalid_request", 400);
         const name = String(b.name || "fitxer").replace(/[\\/:*?"<>|\r\n]+/g, "_").slice(0, 120);
-        await env.BLOBS.put(`t:${b.id}`, JSON.stringify({ parts: b.parts, name, type: String(b.type || "application/octet-stream").slice(0, 100), size: Number(b.size) || 0 }), { expirationTtl: 86400 });
+        const days = Math.min(30, Math.max(1, Number(b.days) || 1));
+        await env.BLOBS.put(`t:${b.id}`, JSON.stringify({ parts: b.parts, name, type: String(b.type || "application/octet-stream").slice(0, 100), size: Number(b.size) || 0 }), { expirationTtl: 86400 * days });
         return json({ url: "/dl/" + b.id + "/" + encodeURIComponent(name) });
       }
       if (p.startsWith("/_blob/")) {
