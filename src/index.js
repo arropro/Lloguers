@@ -173,7 +173,30 @@ async function sendMail(env, { user, pass, name, to, subject, text, att }){
   });
   return rcpts;
 }
-const mailErr = e => e && e.code === "bad_to" ? err("bad_to", 400, "L'adreça de correu no és vàlida") : e && (e.smtp === 535 || e.smtp === 534) ? err("bad_login", 400, "Google no accepta el correu o la contrasenya d'aplicació") : err("mail_failed", 502, String(e && e.message || e).slice(0, 200));
+async function sendInvoiceMail(env, { to, subject, text, docId, filename }){
+  const user = await getSet(env, "smtp_user"), pass = await getSet(env, "smtp_pass"); if (!user || !pass) { const e = new Error("not_configured"); e.code = "not_configured"; throw e; }
+  let att = null;
+  if (docId) { if (!validId(String(docId))) { const e = new Error("not_found"); e.code = "not_found"; throw e; } const bl = await getBlob(env, String(docId)); if (!bl) { const e = new Error("not_found"); e.code = "not_found"; throw e; } att = { type: bl.type, name: String(filename || "Factura.pdf").slice(0, 120), bytes: new Uint8Array(await new Response(bl.body).arrayBuffer()) }; }
+  return sendMail(env, { user, pass, name: (await getSet(env, "smtp_name")) || "", to, subject: String(subject || "").slice(0, 200), text: String(text || "").slice(0, 10000), att });
+}
+// Enviaments programats: es guarden a la mateixa factura (mailAt) i el rellotge del servidor els envia quan toca.
+async function sendScheduled(env){
+  const now = Date.now(), list = (await listCol(env, "moves")).filter(m => m.data.mailAt && !m.data.mailSending && Date.parse(m.data.mailAt) <= now);
+  for (const { id, data: m } of list) {
+    await putDoc(env, "moves", id, { ...m, mailSending: now });
+    try {
+      const to = await sendInvoiceMail(env, { to: m.mailTo, subject: m.mailSubj, text: m.mailText, docId: m.docId, filename: m.docName });
+      const { mailAt, mailSending, mailErr: _e, ...rest } = m;
+      await putDoc(env, "moves", id, { ...rest, sentAt: new Date().toISOString(), sentTo: to.join(", "), sends: [...(m.sends || []), { at: new Date().toISOString(), to: to.join(", "), scheduled: true }] });
+      try { await pushAll(env, { title: "Factura enviada", body: `${m.concept || "Factura"} enviada a ${to.join(", ")}.` }); } catch {}
+    } catch (e) {
+      const { mailSending, ...rest } = m;
+      await putDoc(env, "moves", id, { ...rest, mailAt: null, mailErr: String(e && e.message || e).slice(0, 160) });
+      try { await pushAll(env, { title: "No s'ha pogut enviar la factura", body: `${m.concept || "Factura"}: ${String(e && e.message || e).slice(0, 120)}. Obre l'app per tornar-la a enviar.` }); } catch {}
+    }
+  }
+}
+const mailErr = e => e && e.code === "not_configured" ? err("not_configured", 400, "Falta configurar el correu") : e && e.code === "not_found" ? err("not_found", 404) : e && e.code === "bad_to" ? err("bad_to", 400, "L'adreça de correu no és vàlida") : e && (e.smtp === 535 || e.smtp === 534) ? err("bad_login", 400, "Google no accepta el correu o la contrasenya d'aplicació") : err("mail_failed", 502, String(e && e.message || e).slice(0, 200));
 
 // ---------- saldo de la IA ----------
 // Anthropic no deixa consultar el saldo amb la clau, així que l'app el porta ella:
@@ -261,7 +284,8 @@ async function reminderText(env){
 }
 async function dailyReminder(env){
   const t = madrid();
-  if (t.hour !== 10 || t.day < 5 || t.day > 10) return;          // del dia 5 al 10, a les 10:30 (hora de Madrid)
+  if (t.hour !== 10 || t.day < 5 || t.day > 10) return;          // del dia 5 al 10, a les 10 (hora de Madrid), un cop al dia
+  if ((await getSet(env, "rent_sent")) === t.date) return; await putSet(env, "rent_sent", t.date);
   const msg = await reminderText(env); if (!msg) return;
   await env.DB.prepare("INSERT INTO settings (k, v) VALUES ('push_msg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(msg)).run();
   const { results } = await env.DB.prepare("SELECT endpoint FROM push_subs").all();
@@ -297,7 +321,7 @@ async function extraReminder(env){
 
 // ---------- pàgina d'entrada ----------
 const LOGIN_HTML = (msg = "") => `<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Els meus lloguers</title><script src="/i18n.js?v=9"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
+<title>Els meus lloguers</title><script src="/i18n.js?v=10"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#1B2A5C,#0B1430);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#E8EDFB;padding:24px}
 form{width:100%;max-width:340px;text-align:center}img{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 30px #0006}h1{font-size:22px;margin:18px 0 6px}p{margin:0 0 22px;color:#9FB0DD;font-size:14px}
 input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #33457f;background:#0E1838;color:#fff;font-size:16px;outline:none}input:focus{border-color:#FFC23D}
@@ -415,10 +439,7 @@ async function api(request, env, url) {
   }
   if (p === "/api/mail/send" && m === "POST") {
     const b = await request.json().catch(() => ({}));
-    const user = await getSet(env, "smtp_user"), pass = await getSet(env, "smtp_pass"); if (!user || !pass) return err("not_configured", 400, "Falta configurar el correu");
-    let att = null;
-    if (b.docId) { if (!validId(String(b.docId))) return err("not_found", 404); const bl = await getBlob(env, String(b.docId)); if (!bl) return err("not_found", 404); att = { type: bl.type, name: String(b.filename || "Factura.pdf").slice(0, 120), bytes: new Uint8Array(await new Response(bl.body).arrayBuffer()) }; }
-    try { const sent = await sendMail(env, { user, pass, name: (await getSet(env, "smtp_name")) || "", to: b.to, subject: String(b.subject || "").slice(0, 200), text: String(b.text || "").slice(0, 10000), att }); return json({ ok: true, to: sent }); }
+    try { const sent = await sendInvoiceMail(env, { to: b.to, subject: b.subject, text: b.text, docId: b.docId, filename: b.filename }); return json({ ok: true, to: sent }); }
     catch (e) { return mailErr(e); }
   }
   if (p === "/api/ai/balance" && m === "GET") return json(await balanceInfo(env));
@@ -463,7 +484,7 @@ async function api(request, env, url) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil((async () => { await ensureSchema(env); await dailyReminder(env); try { await extraReminder(env); } catch {} })());
+    ctx.waitUntil((async () => { await ensureSchema(env); try { await sendScheduled(env); } catch {} await dailyReminder(env); try { await extraReminder(env); } catch {} })());
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);

@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=9"></script>
+<script src="/i18n.js?v=10"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -800,6 +800,8 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .invl li > span{flex:1;min-width:0}
 .btn.danger{color:var(--out)}
 .linkbtn.del{text-decoration:none;opacity:.7}
+.istat{display:block;font-size:.74rem;margin-top:2px}.istat.ok{color:var(--in)}.istat.sch{color:var(--accent)}.istat.err{color:var(--out)}.invarch{margin-top:10px}.invarch>summary{font-weight:600;font-size:.9rem}
+.segb{display:flex;background:var(--sunk);border-radius:12px;padding:3px;gap:3px}.segb button{flex:1;font:inherit;font-size:.85rem;font-weight:600;border:0;background:transparent;color:var(--muted);padding:8px;border-radius:9px;cursor:pointer}.segb button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.12)}
 .shgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}.shb{font:inherit;font-size:.8rem;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 4px 10px;display:grid;justify-items:center;gap:7px;cursor:pointer}.shb:disabled{opacity:.45;cursor:default}.shb .shi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
 .penbtn{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;background:var(--surface);color:var(--ink);border:1px solid var(--line);transition:background .15s,transform .15s}
 .penbtn svg{width:18px;height:18px}
@@ -1787,12 +1789,17 @@ const dmy = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/
 const eurInv = v => (Math.round(v*100)/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2});
 function invList(p){ return movesOf(p.id).filter(x=>x.category===INV_CAT).sort((a,b)=>String(b.date).localeCompare(a.date)); }
 function invPanel(p){
-  const L=invList(p).slice(0,4);
+  const all=invList(p), pend=all.filter(x=>!x.sentAt), sent=all.filter(x=>x.sentAt);
+  const st=x=> x.mailAt?`<span class="istat sch">🕒 Programada · ${esc(fmtDT(x.mailAt))}</span>`: x.mailErr?`<span class="istat err">⚠️ No s'ha pogut enviar</span>`: x.sentAt?`<span class="istat ok">✓ Enviada ${esc(fmtDT(x.sentAt))}${x.sentTo?" · "+esc(x.sentTo):""}</span>`:"";
+  const row=(x,arch)=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span>${st(x)}</span><b class="num">${eur(x.amount)}</b>${x.docId?(x.mailAt?`<button type="button" class="linkbtn" data-act="invUnsched" data-id="${x.id}">Cancel·lar</button>`:`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">${arch?"Reenviar":"Enviar"}</button>`):""}${arch?"":`<button type="button" class="linkbtn del" data-act="invDel" data-id="${x.id}" data-confirm="Esborrar?" aria-label="Esborrar la factura ${esc(x.invNo||"")}">🗑</button>`}</li>`;
   return `<section class="panel"><div class="panel-h"><h2>Factures de llum i aigua</h2></div>
     <button type="button" class="btn primary" data-act="invForm" data-id="${p.id}" style="width:100%;justify-content:center;padding:13px">🧾 Fer factura de llum o aigua</button>
-    ${L.length?`<ul class="invl">${L.map(x=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span></span><b class="num">${eur(x.amount)}</b>${x.docId?`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">Enviar</button>`:""}<button type="button" class="linkbtn del" data-act="invDel" data-id="${x.id}" data-confirm="Esborrar?" aria-label="Esborrar la factura ${esc(x.invNo||"")}">🗑</button></li>`).join("")}</ul>`:`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`}
+    ${pend.length?`<ul class="invl">${pend.map(x=>row(x,false)).join("")}</ul>`:""}
+    ${sent.length?`<details class="fold invarch" data-fold="inv-${p.id}"${S.open.has("inv-"+p.id)?" open":""}><summary><span>Enviades <span class="muted">(${sent.length})</span></span>${CHEV}</summary><ul class="invl">${sent.map(x=>row(x,true)).join("")}</ul></details>`:""}
+    ${!all.length?`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`:""}
   </section>`;
 }
+const fmtDT = iso => { const d=new Date(iso); if(isNaN(d)) return ""; return d.toLocaleDateString("ca-ES",{day:"numeric",month:"short"})+" "+d.toLocaleTimeString("ca-ES",{hour:"2-digit",minute:"2-digit"}); };
 // Si la teva adreça és al mateix carrer que el pis però amb un altre número (Homy hi posa el 25), fes servir el número del pis.
 function fixEmAddr(p, a){
   const m=String(p.address||"").match(/^\s*([^,]+?),\s*(\d+[a-z]?)/i); if(!m||!a) return a;
@@ -1877,36 +1884,67 @@ async function invForm(pid){
 let INV_LAST=null;
 // Enviar una factura: el PDF mateix (WhatsApp, Gmail… des del mòbil), descarregar-lo o obrir Gmail amb el missatge.
 let INV_SH=null;
-function invMsg(x, p){
-  const kind=x&&x.invKind==="Aigua"?"del agua":"de la luz", per=x&&(x.concept||"").match(/(\d{2}\/\d{2}\/\d{4})–(\d{2}\/\d{2}\/\d{4})/);
+function invMsg(x, p, lang){
+  const per=x&&(x.concept||"").match(/(\d{2}\/\d{2}\/\d{4})–(\d{2}\/\d{2}\/\d{4})/), aigua=x&&x.invKind==="Aigua";
   const who=(p&&p.inv&&p.inv.emName||"").trim().split(/\s+/)[0]||"";
-  return `Buenos días:\n\nOs adjunto la factura ${kind}${per?` correspondiente al periodo del ${per[1]} al ${per[2]}`:""}${x?`, por un importe de ${eur(x.amount)}`:""}.\n\nQuedo a vuestra disposición para cualquier consulta.\n\nUn saludo${who?",\n"+who:"."}`;
+  if(lang==="ca") return `Bon dia:\n\nUs adjunto la factura ${aigua?"de l'aigua":"de la llum"}${per?` corresponent al període del ${per[1]} al ${per[2]}`:""}${x?`, per un import de ${eur(x.amount)}`:""}.\n\nQuedo a la vostra disposició per a qualsevol consulta.\n\nSalutacions${who?",\n"+who:"."}`;
+  return `Buenos días:\n\nOs adjunto la factura ${aigua?"del agua":"de la luz"}${per?` correspondiente al periodo del ${per[1]} al ${per[2]}`:""}${x?`, por un importe de ${eur(x.amount)}`:""}.\n\nQuedo a vuestra disposición para cualquier consulta.\n\nUn saludo${who?",\n"+who:"."}`;
+}
+function invSubj(x, lang){
+  const per=x&&(x.concept||"").match(/\d{2}\/(\d{2})\/(\d{4})–/), aigua=x&&x.invKind==="Aigua";
+  const M=lang==="ca"?MONTHS_CA:["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  return lang==="ca"?`Factura ${aigua?"aigua":"llum"}${per?" "+M[+per[1]-1]+" "+per[2]:""}`:`Factura ${aigua?"agua":"luz"}${per?" "+M[+per[1]-1]+" "+per[2]:""}`;
 }
 function invShareOpen(src){
   const x=src.moveId?S.moves.find(m=>m.id===src.moveId):null, c=x&&x.contractId?conById(x.contractId):null, p=x?propById(x.propId):null;
   const docId=src.docId||(x&&x.docId)||"", fname=src.fname||(x&&x.docName)||"Factura.pdf";
-  const kindT=x&&x.invKind==="Aigua"?"agua":"luz", per=x&&(x.concept||"").match(/\d{2}\/(\d{2})\/(\d{4})–/);
-  const subj=`Factura ${kindT}${per?" "+["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][+per[1]-1]+" "+per[2]:""}`;
-  INV_SH={docId, fname, cid:c&&c.id, to:(INV_SH&&INV_SH.keep&&INV_SH.to)||(c&&c.email)||"", subj:(INV_SH&&INV_SH.keep&&INV_SH.subj)||subj, msg:(INV_SH&&INV_SH.keep&&INV_SH.msg)||invMsg(x,p), name:(p&&p.inv&&p.inv.emName)||"", src};
-  openSheet("Enviar la factura", `<form class="form" id="f-ish">
-    ${field("Per a (correu de l'empresa)", `<input name="to" type="email" inputmode="email" autocomplete="email" value="${esc(INV_SH.to)}" placeholder="facturas@empresa.com" required data-notr>`)}
+  const keep=INV_SH&&INV_SH.keep&&INV_SH.src&&INV_SH.src.moveId===src.moveId?INV_SH:null;
+  const lang=(keep&&keep.lang)||(c&&c.mailLang)||"es";
+  const mob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
+  INV_SH={docId, fname, cid:c&&c.id, x, p, src, lang, to:(keep&&keep.to)||(c&&c.email)||"", subj:(keep&&keep.subj)||invSubj(x,lang), msg:(keep&&keep.msg)||invMsg(x,p,lang), name:(p&&p.inv&&p.inv.emName)||"", when:(keep&&keep.when)||"", phone:(c&&(c.phone||c.tenantPhone))||""};
+  const tomorrow=new Date(Date.now()+864e5); tomorrow.setHours(9,0,0,0);
+  const dtVal=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+  openSheet(x&&x.sentAt?"Reenviar la factura":"Enviar la factura", `<form class="form" id="f-ish">
+    ${x&&x.sentAt?`<p class="small muted" style="margin:0">Ja la vas enviar el ${esc(fmtDT(x.sentAt))}${x.sentTo?" a "+esc(x.sentTo):""}.</p>`:""}
+    ${field("Per a (correu de l'empresa)", `<input name="to" type="email" inputmode="email" autocomplete="email" value="${esc(INV_SH.to)}" placeholder="facturas@empresa.com" data-notr>`)}
+    <div class="segb ishlang" role="group" aria-label="Idioma del missatge"><button type="button" data-l="es" class="${lang==="es"?"on":""}" data-notr>Castellà</button><button type="button" data-l="ca" class="${lang==="ca"?"on":""}" data-notr>Català</button></div>
     ${field("Assumpte", `<input name="subj" value="${esc(INV_SH.subj)}" data-notr>`)}
     ${field("Missatge", `<textarea name="msg" rows="7" data-notr>${esc(INV_SH.msg)}</textarea>`)}
     <p class="small muted" style="margin:0">📎 ${esc(fname)}</p>
+    <div class="segb ishwhen" role="group" aria-label="Quan"><button type="button" data-w="now" class="${INV_SH.when?"":"on"}">Enviar ara</button><button type="button" data-w="later" class="${INV_SH.when?"on":""}">Programar</button></div>
+    <div id="ish-dt" style="${INV_SH.when?"":"display:none"}">${field("Dia i hora", `<input name="when" type="datetime-local" value="${esc(INV_SH.when||dtVal(tomorrow))}" min="${dtVal(new Date())}">`)}</div>
     <div class="gact col"><button class="btn primary" id="ish-send">✉️ Enviar per correu</button>
+      ${mob?`<button type="button" class="btn" id="ish-wa"><span style="color:#25D366">●</span> Enviar per WhatsApp</button>`:""}
       <button type="button" class="btn" data-act="ishGo" data-id="dl">⬇️ Descarregar el PDF</button></div>
     <p class="small muted" id="ish-st" style="margin:0"></p></form>`);
   const f=$("#f-ish"), st=$("#ish-st"), btn=$("#ish-send");
-  fetch("/api/mail/config",{credentials:"same-origin"}).then(r=>r.json()).then(cfg=>{ INV_SH.cfg=cfg; if(!$("#ish-st")) return; if(cfg.configured){ st.innerHTML=`S'enviarà des de <b data-notr>${esc(cfg.user)}</b> i quedarà als teus Enviats. <button type="button" class="linkbtn" id="ish-chg">Canviar</button>`; $("#ish-chg").onclick=()=>{ const fd=new FormData(f); Object.assign(INV_SH,{to:fd.get("to").trim(), subj:fd.get("subj").trim(), msg:fd.get("msg"), keep:true}); mailSetup(()=>invShareOpen(src)); }; } else st.textContent="El primer cop has de connectar el teu Gmail (només un cop)."; if(!cfg.configured) btn.textContent="✉️ Connectar el Gmail i enviar"; }).catch(()=>{});
-  f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f); Object.assign(INV_SH,{to:fd.get("to").trim(), subj:fd.get("subj").trim(), msg:fd.get("msg")});
+  const grab=()=>{ const fd=new FormData(f); Object.assign(INV_SH,{to:String(fd.get("to")||"").trim(), subj:String(fd.get("subj")||"").trim(), msg:String(fd.get("msg")||""), when:$("#ish-dt").style.display==="none"?"":String(fd.get("when")||"")}); };
+  const label=()=>{ btn.textContent = !(INV_SH.cfg&&INV_SH.cfg.configured) ? "✉️ Connectar el Gmail i enviar" : $("#ish-dt").style.display==="none" ? "✉️ Enviar per correu" : "🕒 Programar l'enviament"; };
+  f.querySelectorAll(".ishlang button").forEach(b=>b.onclick=()=>{ INV_SH.lang=b.dataset.l; f.querySelectorAll(".ishlang button").forEach(o=>o.classList.toggle("on",o===b)); f.subj.value=invSubj(x,INV_SH.lang); f.msg.value=invMsg(x,p,INV_SH.lang); });
+  f.querySelectorAll(".ishwhen button").forEach(b=>b.onclick=()=>{ f.querySelectorAll(".ishwhen button").forEach(o=>o.classList.toggle("on",o===b)); $("#ish-dt").style.display=b.dataset.w==="later"?"":"none"; label(); });
+  fetch("/api/mail/config",{credentials:"same-origin"}).then(r=>r.json()).then(cfg=>{ INV_SH.cfg=cfg; if(!$("#ish-st")) return;
+    if(cfg.configured){ st.innerHTML=`S'enviarà des de <b data-notr>${esc(cfg.user)}</b> i quedarà als teus Enviats. <button type="button" class="linkbtn" id="ish-chg">Canviar</button>`; $("#ish-chg").onclick=()=>{ grab(); INV_SH.keep=true; mailSetup(()=>invShareOpen(src)); }; }
+    else st.textContent="El primer cop has de connectar el teu Gmail (només un cop)."; label(); }).catch(()=>{});
+  const remember=()=>{ if(INV_SH.cid){ const cc=conById(INV_SH.cid), up={}; if(cc&&INV_SH.to&&cc.email!==INV_SH.to) up.email=INV_SH.to; if(cc&&cc.mailLang!==INV_SH.lang) up.mailLang=INV_SH.lang; if(Object.keys(up).length) db.doc("contracts/"+cc.id).update(up).catch(()=>{}); } };
+  f.onsubmit=async e=>{ e.preventDefault(); grab();
+    if(!INV_SH.to){ toast("Escriu el correu de l'empresa."); f.to.focus(); return; }
     if(!INV_SH.cfg||!INV_SH.cfg.configured){ INV_SH.keep=true; mailSetup(()=>invShareOpen(src)); return; }
+    if(INV_SH.when){ const at=new Date(INV_SH.when); if(isNaN(at)||at.getTime()<Date.now()-6e4){ toast("Tria un dia i una hora que encara no hagin passat."); return; }
+      if(!x){ toast("No s'ha pogut programar."); return; }
+      await db.doc("moves/"+x.id).update({mailAt:at.toISOString(), mailTo:INV_SH.to, mailSubj:INV_SH.subj, mailText:INV_SH.msg, mailErr:null}); remember(); INV_SH.keep=false; closeSheet(); toast(`Programada per al ${fmtDT(at.toISOString())} ✓`); return; }
     btn.disabled=true; btn.textContent="Enviant…";
     try{ const r=await fetch("/api/mail/send",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({to:INV_SH.to, subject:INV_SH.subj, text:INV_SH.msg, docId, filename:fname})}); const d=await r.json().catch(()=>({}));
       if(!r.ok) throw new Error((d.error&&d.error.message)||"error");
-      if(INV_SH.cid){ const cc=conById(INV_SH.cid); if(cc&&cc.email!==INV_SH.to) db.doc("contracts/"+cc.id).update({email:INV_SH.to}).catch(()=>{}); }
-      INV_SH.keep=false; closeSheet(); toast("Correu enviat ✓");
-    }catch(err){ btn.disabled=false; btn.textContent="✉️ Enviar per correu"; st.textContent="No s'ha pogut enviar: "+(err.message||"error")+"."; }
+      if(x){ const now=new Date().toISOString(), to=(d.to||[INV_SH.to]).join(", "); await db.doc("moves/"+x.id).update({sentAt:now, sentTo:to, mailErr:null, mailAt:null, sends:[...(x.sends||[]), {at:now, to}]}).catch(()=>{}); }
+      remember(); INV_SH.keep=false; closeSheet(); toast("Correu enviat ✓");
+    }catch(err){ btn.disabled=false; label(); st.textContent="No s'ha pogut enviar: "+(err.message||"error")+"."; }
   };
+  if($("#ish-wa")) $("#ish-wa").onclick=async()=>{ grab(); const b=$("#ish-wa"); b.disabled=true; b.textContent="Preparant…";
+    try{ const r=await fetch("/_blob/"+docId,{credentials:"same-origin"}); if(!r.ok) throw 0; const url=await uploadLink(await r.blob(), fname, "application/pdf", null, 30); if(!url) throw 0;
+      const txt=INV_SH.msg.replace(/^(Os adjunto|Us adjunto)/m, INV_SH.lang==="ca"?"Us envio":"Os envío")+"\n\n📎 "+(INV_SH.lang==="ca"?"Factura en PDF":"Factura en PDF")+": "+url;
+      if(x){ const now=new Date().toISOString(); db.doc("moves/"+x.id).update({sentAt:now, sentTo:"WhatsApp", sends:[...(x.sends||[]), {at:now, to:"WhatsApp"}]}).catch(()=>{}); }
+      remember(); const ph=String(INV_SH.phone||"").replace(/\D/g,""); location.href="https://wa.me/"+(ph.length>=9?(ph.length===9?"34"+ph:ph):"")+"?text="+encodeURIComponent(txt);
+    }catch{ b.disabled=false; b.innerHTML='<span style="color:#25D366">●</span> Enviar per WhatsApp'; toast("No s'ha pogut preparar. Torna-ho a provar."); } };
 }
 function mailSetup(back){
   const cfg=(INV_SH&&INV_SH.cfg)||{};
@@ -3941,6 +3979,7 @@ chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"
   invForm: id => invForm(id),
   invSendLast: () => { if(INV_LAST) invShareOpen({docId:INV_LAST.docId, fname:INV_LAST.fname, moveId:INV_LAST.moveId}); },
   ishGo: k => ishGo(k),
+  invUnsched: async id => { try{ await db.doc("moves/"+id).update({mailAt:null}); toast("Enviament cancel·lat"); }catch{ toast("No s'ha pogut desar."); } },
   invSend: id => invSendMove(id),
   invDel: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; const p=propById(x.propId);
     try{ await db.doc("moves/"+id).delete(); if(x.docId) assets.delete(x.docId).catch(()=>{});
