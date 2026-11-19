@@ -228,9 +228,36 @@ async function dailyReminder(env){
   for (const r of results) { try { await sendPush(env, r.endpoint); } catch {} }
 }
 
+// Despeses que no són de cada mes (derrama, IBI, escombraries, assegurança…) previstes per a aquest mes.
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function fixedMonthsS(it, year){ if (it.freq === "once") return it.ym && it.ym.slice(0, 4) === year ? [+it.ym.slice(5, 7)] : []; const m0 = Math.min(12, Math.max(1, +it.month || 1)); const step = { mensual: 1, trimestral: 3, semestral: 6, anual: 12 }[it.freq] || 12; const out = []; for (let k = 0; k < 12; k += step) out.push(((m0 - 1 + k) % 12) + 1); return out; }
+async function extraText(env){
+  const t = madrid(), mo = t.ym, mm = +mo.slice(5, 7), mes = MESOS[mm - 1];
+  const props = await listCol(env, "props"), moves = (await listCol(env, "moves")).map(m => m.data).filter(m => m.type === "despesa" && (m.period || String(m.date || "").slice(0, 7)) === mo);
+  const items = [];
+  for (const { id, data: p } of props) {
+    for (const it of (p.fixed || [])) {
+      if (!it || it.freq === "mensual") continue;
+      if (!(it.freq === "once" ? it.ym === mo : fixedMonthsS(it, mo.slice(0, 4)).includes(mm))) continue;
+      const done = moves.some(x => x.propId === id && x.category === it.category && (!it.concept || x.category !== "Altres despeses" || norm([x.concept, x.provider].join(" ")).includes(norm(it.concept).split(" ")[0])));
+      if (!done) items.push({ name: (it.concept || it.category) + " · " + String(p.name || "Pis").replace(/^pis\s+/i, "").replace(/\s*\(.*?\)\s*$/, ""), amount: +it.amount || 0 });
+    }
+  }
+  if (!items.length) return null;
+  const total = items.reduce((a, i) => a + i.amount, 0);
+  return { title: `Aquest ${mes} tens despeses extra: ${eurCa(total)}`, body: items.map(i => `${i.name} (${eurCa(i.amount)})`).join(", ") + ". Ja estan restades del que et quedarà." };
+}
+async function extraReminder(env){
+  const t = madrid();
+  if (t.hour !== 10 || t.day > 3) return;                        // a principi de mes (dies 1 a 3), a les 10:30, un sol cop
+  if ((await getSet(env, "extra_sent")) === t.ym) return;
+  const msg = await extraText(env); await putSet(env, "extra_sent", t.ym); if (!msg) return;
+  await pushAll(env, msg);
+}
+
 // ---------- pàgina d'entrada ----------
 const LOGIN_HTML = (msg = "") => `<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Els meus lloguers</title><script src="/i18n.js?v=6"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
+<title>Els meus lloguers</title><script src="/i18n.js?v=7"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#1B2A5C,#0B1430);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#E8EDFB;padding:24px}
 form{width:100%;max-width:340px;text-align:center}img{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 30px #0006}h1{font-size:22px;margin:18px 0 6px}p{margin:0 0 22px;color:#9FB0DD;font-size:14px}
 input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #33457f;background:#0E1838;color:#fff;font-size:16px;outline:none}input:focus{border-color:#FFC23D}
@@ -378,7 +405,7 @@ async function api(request, env, url) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil((async () => { await ensureSchema(env); await dailyReminder(env); })());
+    ctx.waitUntil((async () => { await ensureSchema(env); await dailyReminder(env); try { await extraReminder(env); } catch {} })());
   },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
