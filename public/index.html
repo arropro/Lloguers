@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=12"></script>
+<script src="/i18n.js?v=13"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -803,6 +803,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .istat{display:block;font-size:.74rem;margin-top:2px}.istat.ok{color:var(--in)}.istat.sch{color:var(--accent)}.istat.err{color:var(--out)}.invarch{margin-top:10px}.invarch>summary{font-weight:600;font-size:.9rem}
 .segb{display:flex;background:var(--sunk);border-radius:12px;padding:3px;gap:3px}.segb button{flex:1;font:inherit;font-size:.85rem;font-weight:600;border:0;background:transparent;color:var(--muted);padding:8px;border-radius:9px;cursor:pointer}.segb button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.12)}
 .num.neu{color:var(--muted)}.note.neutral{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
+.invold{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}.invold .chip{border:0;cursor:pointer}
 .shgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}.shb{font:inherit;font-size:.8rem;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 4px 10px;display:grid;justify-items:center;gap:7px;cursor:pointer}.shb:disabled{opacity:.45;cursor:default}.shb .shi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
 .penbtn{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;background:var(--surface);color:var(--ink);border:1px solid var(--line);transition:background .15s,transform .15s}
 .penbtn svg{width:18px;height:18px}
@@ -1789,14 +1790,21 @@ function passThru(x){
 const dmy = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; };
 const eurInv = v => (Math.round(v*100)/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2});
 function invList(p){ return movesOf(p.id).filter(x=>x.category===INV_CAT).sort((a,b)=>String(b.date).localeCompare(a.date)); }
+function invRow(x, arch){
+  const st= x.mailAt?`<span class="istat sch">🕒 Programada · ${esc(fmtDT(x.mailAt))}</span>`: x.mailErr?`<span class="istat err">⚠️ No s'ha pogut enviar</span>`: x.sentAt?`<span class="istat ok">✓ Enviada ${esc(fmtDT(x.sentAt))}${x.sentTo?" · "+esc(x.sentTo):""}</span>`:"";
+  return `<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span>${st}</span><b class="num">${eur(x.amount)}</b>${x.docId?(x.mailAt?`<button type="button" class="linkbtn" data-act="invUnsched" data-id="${x.id}">Cancel·lar</button>`:`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">${arch?"Reenviar":"Enviar"}</button>`):""}${arch?"":`<button type="button" class="linkbtn del" data-act="invDel" data-id="${x.id}" data-confirm="Esborrar?" aria-label="Esborrar la factura ${esc(x.invNo||"")}">🗑</button>`}</li>`;
+}
 function invPanel(p){
-  const all=invList(p), pend=all.filter(x=>!x.sentAt), sent=all.filter(x=>x.sentAt);
-  const st=x=> x.mailAt?`<span class="istat sch">🕒 Programada · ${esc(fmtDT(x.mailAt))}</span>`: x.mailErr?`<span class="istat err">⚠️ No s'ha pogut enviar</span>`: x.sentAt?`<span class="istat ok">✓ Enviada ${esc(fmtDT(x.sentAt))}${x.sentTo?" · "+esc(x.sentTo):""}</span>`:"";
-  const row=(x,arch)=>`<li><span><b>Fra ${esc(x.invNo||"")}</b> · ${esc(x.invKind||"")} <span class="muted small">${fmtDate(x.date)}</span>${st(x)}</span><b class="num">${eur(x.amount)}</b>${x.docId?(x.mailAt?`<button type="button" class="linkbtn" data-act="invUnsched" data-id="${x.id}">Cancel·lar</button>`:`<button type="button" class="linkbtn" data-act="invSend" data-id="${x.id}">${arch?"Reenviar":"Enviar"}</button>`):""}${arch?"":`<button type="button" class="linkbtn del" data-act="invDel" data-id="${x.id}" data-confirm="Esborrar?" aria-label="Esborrar la factura ${esc(x.invNo||"")}">🗑</button>`}</li>`;
+  const all=invList(p), pend=all.filter(x=>!x.sentAt);
+  const curIds=new Set(current(p.id).map(c=>c.id)), isCur=x=>!x.contractId||curIds.has(x.contractId)||!conById(x.contractId);
+  const sent=all.filter(x=>x.sentAt&&isCur(x)), old={};
+  all.filter(x=>x.sentAt&&!isCur(x)).forEach(x=>{ (old[x.contractId]=old[x.contractId]||[]).push(x); });
+  const oldL=Object.entries(old).map(([cid,l])=>({c:conById(cid), n:l.length})).sort((a,b)=>String(b.c.end||"").localeCompare(String(a.c.end||"")));
   return `<section class="panel"><div class="panel-h"><h2>Factures de llum i aigua</h2></div>
     <button type="button" class="btn primary" data-act="invForm" data-id="${p.id}" style="width:100%;justify-content:center;padding:13px">🧾 Fer factura de llum o aigua</button>
-    ${pend.length?`<ul class="invl">${pend.map(x=>row(x,false)).join("")}</ul>`:""}
-    ${sent.length?`<details class="fold invarch" data-fold="inv-${p.id}"${S.open.has("inv-"+p.id)?" open":""}><summary><span>Enviades <span class="muted">(${sent.length})</span></span>${CHEV}</summary><ul class="invl">${sent.map(x=>row(x,true)).join("")}</ul></details>`:""}
+    ${pend.length?`<ul class="invl">${pend.map(x=>invRow(x,false)).join("")}</ul>`:""}
+    ${sent.length?`<details class="fold invarch" data-fold="inv-${p.id}"${S.open.has("inv-"+p.id)?" open":""}><summary><span>Enviades <span class="muted">(${sent.length})</span></span>${CHEV}</summary><ul class="invl">${sent.map(x=>invRow(x,true)).join("")}</ul></details>`:""}
+    ${oldL.length?`<div class="invold"><span class="small muted">Empreses anteriors:</span>${oldL.map(o=>`<button type="button" class="chip" data-act="showContract" data-id="${o.c.id}">${esc((String(o.c.tenantName||"Empresa").replace(/,?\s*(S\.?L\.?U?\.?|S\.?A\.?U?\.?)\s*$/i,"").trim()).slice(0,26))} · ${o.n} factur${o.n>1?"es":"a"}</button>`).join("")}</div>`:""}
     ${!all.length?`<p class="small muted" style="margin-top:8px">Les factures que facis es guarden aquí i als documents del pis.</p>`:""}
   </section>`;
 }
@@ -1888,8 +1896,8 @@ let INV_SH=null;
 function invMsg(x, p, lang){
   const per=x&&(x.concept||"").match(/(\d{2}\/\d{2}\/\d{4})–(\d{2}\/\d{2}\/\d{4})/), aigua=x&&x.invKind==="Aigua";
   const who=(p&&p.inv&&p.inv.emName||"").trim().split(/\s+/)[0]||"";
-  if(lang==="ca") return `Bon dia:\n\nUs adjunto la factura ${aigua?"de l'aigua":"de la llum"}${per?` corresponent al període del ${per[1]} al ${per[2]}`:""}${x?`, per un import de ${eur(x.amount)}`:""}.\n\nQuedo a la vostra disposició per a qualsevol consulta.\n\nSalutacions${who?",\n"+who:"."}`;
-  return `Buenos días:\n\nOs adjunto la factura ${aigua?"del agua":"de la luz"}${per?` correspondiente al periodo del ${per[1]} al ${per[2]}`:""}${x?`, por un importe de ${eur(x.amount)}`:""}.\n\nQuedo a vuestra disposición para cualquier consulta.\n\nUn saludo${who?",\n"+who:"."}`;
+  if(lang==="ca") return `Bon dia.\n\nUs adjunto la factura ${aigua?"de l'aigua":"de la llum"}${per?` corresponent al període del ${per[1]} al ${per[2]}`:""}${x?`, per un import de ${eur(x.amount)}`:""}.\n\nQuedo a la vostra disposició per a qualsevol consulta.\n\nSalutacions${who?",\n"+who:"."}`;
+  return `Buenos días.\n\nOs adjunto la factura ${aigua?"del agua":"de la luz"}${per?` correspondiente al periodo del ${per[1]} al ${per[2]}`:""}${x?`, por un importe de ${eur(x.amount)}`:""}.\n\nQuedo a vuestra disposición para cualquier consulta.\n\nUn saludo${who?",\n"+who:"."}`;
 }
 function invSubj(x, lang){
   const per=x&&(x.concept||"").match(/\d{2}\/(\d{2})\/(\d{4})–/), aigua=x&&x.invKind==="Aigua";
@@ -2060,6 +2068,7 @@ function showContract(id){
       <div><span class="label">Net</span><span class="num big">${eur(inc-com)}</span><span class="small muted">${days?`${eur((inc-com)/days*30.44)} per mes`:""}</span></div>
     </div>
     ${contractCard(c)}
+    ${(()=>{ const L=S.moves.filter(m=>m.category===INV_CAT&&m.contractId===c.id).sort((a,b)=>String(b.date).localeCompare(a.date)); return L.length?`<div class="invc"><h3 style="margin:6px 0 2px">Factures de llum i aigua <span class="muted">(${L.length})</span></h3><ul class="invl">${L.map(x=>invRow(x,!!x.sentAt)).join("")}</ul></div>`:""; })()}
   </div>`, "Tanca");
 }
 /* ---------- contracts ---------- */
@@ -2819,7 +2828,7 @@ function moveForm(m={}, o={}){
   openSheet(o.title || (m.id?"Editar moviment":o.ai?"Revisa i desa":"Nou moviment"), `<form class="form" id="f-move">
     ${o.note?`<div class="note ${o.warn?"warn":""}">${esc(o.note)}</div>`:""}
     ${fileBox}
-    ${m.id&&passThru(m)?`<div class="note neutral">↔︎ ${m.category===INV_CAT?"Llum o aigua refacturada a l'empresa":"Factura ja refacturada a l'empresa"}: <b>no compta ni com a ingrés ni com a despesa</b>, perquè l'empresa te la torna.</div>`:""}
+    ${m.id&&passThru(m)?`<div class="note neutral">↔︎ Refacturada: no compta ni com a ingrés ni com a despesa.</div>`:""}
     <div class="seg" role="radiogroup" aria-label="Tipus" ${o.only||(m.id&&passThru(m))?"hidden":""}>
       <label><input type="radio" name="type" value="despesa" ${type==="despesa"?"checked":""}>Despesa</label>
       <label><input type="radio" name="type" value="ingres" ${type==="ingres"?"checked":""}>Ingrés</label></div>
