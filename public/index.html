@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=8"></script>
+<script src="/i18n.js?v=9"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -1884,38 +1884,50 @@ function invMsg(x, p){
 }
 function invShareOpen(src){
   const x=src.moveId?S.moves.find(m=>m.id===src.moveId):null, c=x&&x.contractId?conById(x.contractId):null, p=x?propById(x.propId):null;
-  const fname=src.fname||(x&&x.docName)||"Factura.pdf";
-  const mob=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
-  const canFiles=!!(navigator.canShare&&navigator.share&&navigator.canShare({files:[new File([new Blob(["x"],{type:"application/pdf"})],"a.pdf",{type:"application/pdf"})]}));
+  const docId=src.docId||(x&&x.docId)||"", fname=src.fname||(x&&x.docName)||"Factura.pdf";
   const kindT=x&&x.invKind==="Aigua"?"agua":"luz", per=x&&(x.concept||"").match(/\d{2}\/(\d{2})\/(\d{4})–/);
-  INV_SH={blob:src.blob||null, fname, to:(c&&c.email)||"", subj:`Factura ${kindT}${per?" "+["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][+per[1]-1]+" "+per[2]:""}`};
-  openSheet("Enviar la factura", `<div class="form">
-    <label class="field"><span>Missatge (es copia sol perquè l'enganxis)</span><textarea id="ish-msg" rows="7" data-notr>${esc(invMsg(x,p))}</textarea></label>
-    <p class="small muted" id="ish-st">Preparant el PDF…</p>
-    <div class="gact col">
-      ${mob&&canFiles?`<button type="button" class="btn primary" data-act="ishGo" data-id="share" disabled>📤 Enviar el PDF (WhatsApp, Gmail…)</button>`:""}
-      ${!mob?`<button type="button" class="btn primary" data-act="ishGo" data-id="gm" disabled>✉️ Preparar el correu a Gmail</button>`:""}
-      ${!mob&&canFiles?`<button type="button" class="btn" data-act="ishGo" data-id="share" disabled>📤 Enviar el PDF amb Mail, Missatges…</button>`:""}
-      <button type="button" class="btn" data-act="ishGo" data-id="dl" disabled>⬇️ Descarregar el PDF</button>
-    </div>
-    <p class="small muted" style="margin:2px 0 0">${mob?"Toca «Enviar el PDF» i tria WhatsApp, Gmail o l'app que vulguis: hi anirà la factura com a PDF. El missatge ja està copiat: només l'has d'enganxar.":"Gmail no deixa que una web hi enganxi fitxers: es descarregarà el PDF i s'obrirà el correu amb l'assumpte i el missatge escrits. Només hauràs d'arrossegar-hi el PDF (o tocar el clip i triar-lo a Baixades)."}</p>
-    <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Tancar</button></div></div>`);
-  (async()=>{ try{
-    if(!INV_SH.blob){ const r=await fetch("/_blob/"+x.docId,{credentials:"same-origin"}); if(!r.ok) throw 0; INV_SH.blob=await r.blob(); }
-    INV_SH.file=new File([INV_SH.blob], fname, {type:"application/pdf"});
-    const st=document.getElementById("ish-st"); if(st) st.textContent="Factura a punt.";
-    document.querySelectorAll('[data-act="ishGo"]').forEach(b=>b.disabled=false);
-  }catch{ const st=document.getElementById("ish-st"); if(st) st.textContent="No s'ha pogut obrir la factura. Comprova la connexió i torna-ho a provar."; } })();
+  const subj=`Factura ${kindT}${per?" "+["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"][+per[1]-1]+" "+per[2]:""}`;
+  INV_SH={docId, fname, cid:c&&c.id, to:(INV_SH&&INV_SH.keep&&INV_SH.to)||(c&&c.email)||"", subj:(INV_SH&&INV_SH.keep&&INV_SH.subj)||subj, msg:(INV_SH&&INV_SH.keep&&INV_SH.msg)||invMsg(x,p), name:(p&&p.inv&&p.inv.emName)||"", src};
+  openSheet("Enviar la factura", `<form class="form" id="f-ish">
+    ${field("Per a (correu de l'empresa)", `<input name="to" type="email" inputmode="email" autocomplete="email" value="${esc(INV_SH.to)}" placeholder="facturas@empresa.com" required data-notr>`)}
+    ${field("Assumpte", `<input name="subj" value="${esc(INV_SH.subj)}" data-notr>`)}
+    ${field("Missatge", `<textarea name="msg" rows="7" data-notr>${esc(INV_SH.msg)}</textarea>`)}
+    <p class="small muted" style="margin:0">📎 ${esc(fname)}</p>
+    <div class="gact col"><button class="btn primary" id="ish-send">✉️ Enviar per correu</button>
+      <button type="button" class="btn" data-act="ishGo" data-id="dl">⬇️ Descarregar el PDF</button></div>
+    <p class="small muted" id="ish-st" style="margin:0"></p></form>`);
+  const f=$("#f-ish"), st=$("#ish-st"), btn=$("#ish-send");
+  fetch("/api/mail/config",{credentials:"same-origin"}).then(r=>r.json()).then(cfg=>{ INV_SH.cfg=cfg; if(!$("#ish-st")) return; if(cfg.configured){ st.innerHTML=`S'enviarà des de <b data-notr>${esc(cfg.user)}</b> i quedarà als teus Enviats. <button type="button" class="linkbtn" id="ish-chg">Canviar</button>`; $("#ish-chg").onclick=()=>{ const fd=new FormData(f); Object.assign(INV_SH,{to:fd.get("to").trim(), subj:fd.get("subj").trim(), msg:fd.get("msg"), keep:true}); mailSetup(()=>invShareOpen(src)); }; } else st.textContent="El primer cop has de connectar el teu Gmail (només un cop)."; if(!cfg.configured) btn.textContent="✉️ Connectar el Gmail i enviar"; }).catch(()=>{});
+  f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f); Object.assign(INV_SH,{to:fd.get("to").trim(), subj:fd.get("subj").trim(), msg:fd.get("msg")});
+    if(!INV_SH.cfg||!INV_SH.cfg.configured){ INV_SH.keep=true; mailSetup(()=>invShareOpen(src)); return; }
+    btn.disabled=true; btn.textContent="Enviant…";
+    try{ const r=await fetch("/api/mail/send",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({to:INV_SH.to, subject:INV_SH.subj, text:INV_SH.msg, docId, filename:fname})}); const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error((d.error&&d.error.message)||"error");
+      if(INV_SH.cid){ const cc=conById(INV_SH.cid); if(cc&&cc.email!==INV_SH.to) db.doc("contracts/"+cc.id).update({email:INV_SH.to}).catch(()=>{}); }
+      INV_SH.keep=false; closeSheet(); toast("Correu enviat ✓");
+    }catch(err){ btn.disabled=false; btn.textContent="✉️ Enviar per correu"; st.textContent="No s'ha pogut enviar: "+(err.message||"error")+"."; }
+  };
 }
-function ishCopy(){ const m=(document.getElementById("ish-msg")||{}).value||""; try{ navigator.clipboard&&navigator.clipboard.writeText(m).catch(()=>{}); }catch{} return m; }
-function ishDownload(){ const S2=INV_SH, a=document.createElement("a"); a.href=URL.createObjectURL(S2.blob); a.download=S2.fname; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },3000); }
-function ishGo(k){ const S2=INV_SH; if(!S2||!S2.blob) return;
-  if(k==="share"){ const m=ishCopy(); navigator.share({files:[S2.file]}).then(()=>{},e=>{ if(e&&e.name!=="AbortError") toast("No s'ha pogut obrir. Prova «Descarregar el PDF»."); }); if(m) toast("Missatge copiat: enganxa'l després del PDF"); }
-  else if(k==="gm"){ const m=ishCopy(); ishDownload();
-    window.open("https://mail.google.com/mail/?view=cm&fs=1"+(S2.to?"&to="+encodeURIComponent(S2.to):"")+"&su="+encodeURIComponent(S2.subj)+"&body="+encodeURIComponent(m),"_blank","noopener"); }
-  else if(k==="dl"){ ishDownload(); toast("Factura descarregada"); }
+function mailSetup(back){
+  const cfg=(INV_SH&&INV_SH.cfg)||{};
+  openSheet("Connectar el teu Gmail", `<form class="form" id="f-mail">
+    <p style="margin:0">Perquè l'app enviï correus des del teu Gmail, Google demana una <b>contrasenya d'aplicació</b> (una clau només per a aquesta app). Es fa un sol cop:</p>
+    <ol class="small" style="margin:0;padding-left:20px;line-height:1.6"><li>Toca el botó de sota per obrir la pàgina de Google.</li><li>Si t'ho demana, activa la <b>verificació en 2 passos</b>.</li><li>Escriu un nom, per exemple <b>Lloguers</b>, i toca <b>Crear</b>.</li><li>Copia les 16 lletres que surten i enganxa-les aquí.</li></ol>
+    <a class="btn" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">🔑 Obrir la pàgina de Google</a>
+    ${field("El teu Gmail", `<input name="user" type="email" inputmode="email" autocomplete="email" value="${esc(cfg.user||"")}" placeholder="nom@gmail.com" required data-notr>`)}
+    ${field("Nom que veurà l'empresa", `<input name="name" value="${esc(cfg.name||(INV_SH&&INV_SH.name)||"")}" data-notr>`)}
+    ${field("Contrasenya d'aplicació (16 lletres)", `<input name="pass" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="abcd efgh ijkl mnop" required data-notr>`)}
+    <p class="small muted" style="margin:0" id="mail-st">Es guarda només a la teva app. La pots esborrar quan vulguis des de la pàgina de Google.</p>
+    <div class="actions"><button type="button" class="btn ghost" data-act="closeSheet">Cancel·lar</button><button class="btn primary" id="mail-ok">Desar i provar</button></div></form>`);
+  const f=$("#f-mail");
+  f.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(f), b=$("#mail-ok"), st=$("#mail-st"); b.disabled=true; b.textContent="Provant…";
+    try{ const r=await fetch("/api/mail/config",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({user:fd.get("user"), name:fd.get("name"), pass:fd.get("pass")})}); const d=await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error((d.error&&d.error.message)||"error");
+      toast("Gmail connectat ✓"); if(INV_SH) INV_SH.cfg={configured:true, user:String(fd.get("user")).trim().toLowerCase()}; if(back) back(); else closeSheet();
+    }catch(err){ b.disabled=false; b.textContent="Desar i provar"; st.textContent=(err.message||"No ha funcionat")+". Revisa el correu i les 16 lletres."; st.style.color="var(--out)"; }
+  };
 }
-const SH_IC={};
+function ishGo(k){ const S2=INV_SH; if(!S2) return; if(k==="dl"&&S2.docId) location.href="/_blob/"+S2.docId+"?dl=1&n="+encodeURIComponent(S2.fname); }
 async function invShare(blob, fname){ invShareOpen({blob, fname, moveId:INV_LAST&&INV_LAST.blob===blob?INV_LAST.moveId:null}); }
 function invSendMove(id){ const x=S.moves.find(m=>m.id===id); if(!x||!x.docId) return; invShareOpen({moveId:id}); }
 // PDF senzill fet a mà (sense llibreries): text Helvetica, línies i colors. Així funciona sempre, fins i tot sense internet.
@@ -3927,7 +3939,7 @@ chkOk: async ids => { try{ for(const id of ids.split(",")) await db.doc("moves/"
   chkDep: id => chkDep(id),
   chkDepNone: async id => { try{ await db.doc("contracts/"+id).update({depositNone:true}); chkAgain(); }catch{ toast("No s'ha pogut desar."); } },
   invForm: id => invForm(id),
-  invSendLast: () => { if(INV_LAST) invShareOpen({blob:INV_LAST.blob, fname:INV_LAST.fname, moveId:INV_LAST.moveId}); },
+  invSendLast: () => { if(INV_LAST) invShareOpen({docId:INV_LAST.docId, fname:INV_LAST.fname, moveId:INV_LAST.moveId}); },
   ishGo: k => ishGo(k),
   invSend: id => invSendMove(id),
   invDel: async id => { const x=S.moves.find(m=>m.id===id); if(!x) return; const p=propById(x.propId);

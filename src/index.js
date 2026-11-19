@@ -135,6 +135,46 @@ async function askClaude(env, request) {
   return json({ text, truncated: data.stop_reason === "max_tokens" });
 }
 
+// ---------- enviar correus des del teu Gmail (factures) ----------
+// Fa servir una «contrasenya d'aplicació» de Google (es guarda a la base de dades, mai al codi).
+const b64 = bytes => { let s = ""; const CH = 0x8000; for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH)); return btoa(s); };
+const b64s = str => b64(enc.encode(str));
+const wrap76 = s => s.replace(/.{1,76}/g, "$&\r\n");
+const hdrEnc = str => /^[\x20-\x7e]*$/.test(str) ? str : `=?UTF-8?B?${b64s(str)}?=`;
+async function smtpOpen(env){
+  if (env.SMTP_CONNECT) return env.SMTP_CONNECT();               // proves locals
+  const { connect } = await import("cloudflare:sockets");
+  return connect({ hostname: "smtp.gmail.com", port: 465 }, { secureTransport: "on", allowHalfOpen: false });
+}
+async function smtpSession(env, user, pass, fn){
+  const sock = await smtpOpen(env), w = sock.writable.getWriter(), r = sock.readable.getReader(), dec = new TextDecoder(); let buf = "";
+  const read = async () => { for (;;) { const lines = buf.split("\r\n"); for (let i = 0; i < lines.length - 1; i++) { if (/^\d{3} /.test(lines[i])) { const out = lines.slice(0, i + 1).join("\n"); buf = lines.slice(i + 1).join("\r\n"); return { code: +lines[i].slice(0, 3), text: out }; } }
+      const { value, done } = await r.read(); if (done) throw new Error("connexió tancada"); buf += dec.decode(value, { stream: true }); } };
+  const cmd = async (line, ok) => { if (line !== null) await w.write(enc.encode(line + "\r\n")); const res = await read(); if (ok && !ok.includes(res.code)) { const e = new Error(res.text); e.smtp = res.code; throw e; } return res; };
+  try {
+    await cmd(null, [220]); await cmd("EHLO lloguers.app", [250]);
+    await cmd("AUTH LOGIN", [334]); await cmd(b64s(user), [334]); await cmd(b64s(pass.replace(/\s+/g, "")), [235]);
+    if (fn) await fn(cmd, w);
+    await cmd("QUIT", null).catch(() => {});
+  } finally { try { w.releaseLock(); r.releaseLock(); await sock.close(); } catch {} }
+}
+async function sendMail(env, { user, pass, name, to, subject, text, att }){
+  const rcpts = String(to).split(/[,;\s]+/).map(x => x.trim()).filter(x => /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(x));
+  if (!rcpts.length) { const e = new Error("bad_to"); e.code = "bad_to"; throw e; }
+  const bnd = "lloguers-" + crypto.randomUUID();
+  const msg = [`From: ${hdrEnc(name || user)} <${user}>`, `To: ${rcpts.join(", ")}`, `Subject: ${hdrEnc(subject || "Factura")}`, `Date: ${new Date().toUTCString()}`, `Message-ID: <${crypto.randomUUID()}@lloguers.app>`, "MIME-Version: 1.0", `Content-Type: multipart/mixed; boundary="${bnd}"`, "",
+    `--${bnd}`, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap76(b64s(text || "")),
+    ...(att ? [`--${bnd}`, `Content-Type: ${att.type}; name="${att.name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "")}"`, "Content-Transfer-Encoding: base64", `Content-Disposition: attachment; filename="${att.name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "")}"; filename*=UTF-8''${encodeURIComponent(att.name)}`, "", wrap76(b64(att.bytes))] : []),
+    `--${bnd}--`, ""].join("\r\n").replace(/\r\n\./g, "\r\n..");
+  await smtpSession(env, user, pass, async (cmd, w) => {
+    await cmd(`MAIL FROM:<${user}>`, [250]);
+    for (const t of rcpts) await cmd(`RCPT TO:<${t}>`, [250, 251]);
+    await cmd("DATA", [354]); await w.write(enc.encode(msg + "\r\n.\r\n")); await cmd(null, [250]);
+  });
+  return rcpts;
+}
+const mailErr = e => e && e.code === "bad_to" ? err("bad_to", 400, "L'adreça de correu no és vàlida") : e && (e.smtp === 535 || e.smtp === 534) ? err("bad_login", 400, "Google no accepta el correu o la contrasenya d'aplicació") : err("mail_failed", 502, String(e && e.message || e).slice(0, 200));
+
 // ---------- saldo de la IA ----------
 // Anthropic no deixa consultar el saldo amb la clau, així que l'app el porta ella:
 // tu poses el saldo que tens i cada lectura en resta el cost aproximat.
@@ -257,7 +297,7 @@ async function extraReminder(env){
 
 // ---------- pàgina d'entrada ----------
 const LOGIN_HTML = (msg = "") => `<!doctype html><html lang="ca"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Els meus lloguers</title><script src="/i18n.js?v=8"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
+<title>Els meus lloguers</title><script src="/i18n.js?v=9"></script><meta name="theme-color" content="#0B1430"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="icon" href="/icon-192.png">
 <style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#1B2A5C,#0B1430);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#E8EDFB;padding:24px}
 form{width:100%;max-width:340px;text-align:center}img{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 30px #0006}h1{font-size:22px;margin:18px 0 6px}p{margin:0 0 22px;color:#9FB0DD;font-size:14px}
 input{width:100%;padding:14px 16px;border-radius:14px;border:1px solid #33457f;background:#0E1838;color:#fff;font-size:16px;outline:none}input:focus{border-color:#FFC23D}
@@ -362,6 +402,24 @@ async function api(request, env, url) {
   if (p === "/api/ai/usage" && m === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM ai_usage ORDER BY month DESC LIMIT 12").all();
     return json({ usage: results, model: env.AI_MODEL || DEFAULT_MODEL });
+  }
+  if (p === "/api/mail/config" && m === "GET") { const u = await getSet(env, "smtp_user"); return json({ user: u || "", name: (await getSet(env, "smtp_name")) || "", configured: !!(u && await getSet(env, "smtp_pass")) }); }
+  if (p === "/api/mail/config" && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    if (b.remove) { await putSet(env, "smtp_user", null); await putSet(env, "smtp_pass", null); return json({ ok: true }); }
+    const user = String(b.user || "").trim().toLowerCase(), pass = String(b.pass || "").replace(/\s+/g, ""), name = String(b.name || "").trim().slice(0, 80);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(user) || pass.length < 12) return err("invalid_request", 400, "Falta el correu o la contrasenya d'aplicació");
+    try { await smtpSession(env, user, pass, null); } catch (e) { return mailErr(e); }
+    await putSet(env, "smtp_user", user); await putSet(env, "smtp_pass", pass); if (name) await putSet(env, "smtp_name", name);
+    return json({ ok: true });
+  }
+  if (p === "/api/mail/send" && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const user = await getSet(env, "smtp_user"), pass = await getSet(env, "smtp_pass"); if (!user || !pass) return err("not_configured", 400, "Falta configurar el correu");
+    let att = null;
+    if (b.docId) { if (!validId(String(b.docId))) return err("not_found", 404); const bl = await getBlob(env, String(b.docId)); if (!bl) return err("not_found", 404); att = { type: bl.type, name: String(b.filename || "Factura.pdf").slice(0, 120), bytes: new Uint8Array(await new Response(bl.body).arrayBuffer()) }; }
+    try { const sent = await sendMail(env, { user, pass, name: (await getSet(env, "smtp_name")) || "", to: b.to, subject: String(b.subject || "").slice(0, 200), text: String(b.text || "").slice(0, 10000), att }); return json({ ok: true, to: sent }); }
+    catch (e) { return mailErr(e); }
   }
   if (p === "/api/ai/balance" && m === "GET") return json(await balanceInfo(env));
   if (p === "/api/ai/balance" && m === "POST") {
@@ -471,7 +529,9 @@ export default {
         if (!validId(id)) return err("not_found", 404);
         const b = await getBlob(env, id);
         if (!b) return new Response("No trobat", { status: 404 });
-        return new Response(b.body, { headers: { "content-type": b.type, "cache-control": "private, max-age=31536000, immutable", "x-content-type-options": "nosniff" } });
+        const h = { "content-type": b.type, "cache-control": "private, max-age=31536000, immutable", "x-content-type-options": "nosniff" };
+        if (url.searchParams.get("dl")) { const n = String(url.searchParams.get("n") || "document.pdf").replace(/[\\/:*?"<>|\r\n]+/g, "_").slice(0, 120); h["content-disposition"] = `attachment; filename="${n.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(n)}`; h["cache-control"] = "private, no-store"; }
+        return new Response(b.body, { headers: h });
       }
       if (p.startsWith("/api/")) return await api(request, env, url);
       return env.ASSETS.fetch(request);
