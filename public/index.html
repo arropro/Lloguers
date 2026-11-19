@@ -11,7 +11,7 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script src="/i18n.js?v=11"></script>
+<script src="/i18n.js?v=12"></script>
 <script src="/shim.js"></script>
 <link rel="stylesheet" href="/lang.css?v=1">
 <style>
@@ -802,6 +802,7 @@ svg.spk[data-a]{touch-action:pan-y;cursor:crosshair}
 .linkbtn.del{text-decoration:none;opacity:.7}
 .istat{display:block;font-size:.74rem;margin-top:2px}.istat.ok{color:var(--in)}.istat.sch{color:var(--accent)}.istat.err{color:var(--out)}.invarch{margin-top:10px}.invarch>summary{font-weight:600;font-size:.9rem}
 .segb{display:flex;background:var(--sunk);border-radius:12px;padding:3px;gap:3px}.segb button{flex:1;font:inherit;font-size:.85rem;font-weight:600;border:0;background:transparent;color:var(--muted);padding:8px;border-radius:9px;cursor:pointer}.segb button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.12)}
+.num.neu{color:var(--muted)}.note.neutral{background:var(--sunk);color:var(--ink);border:1px solid var(--line)}
 .shgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 4px}.shb{font:inherit;font-size:.8rem;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 4px 10px;display:grid;justify-items:center;gap:7px;cursor:pointer}.shb:disabled{opacity:.45;cursor:default}.shb .shi{width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
 .penbtn{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer;background:var(--surface);color:var(--ink);border:1px solid var(--line);transition:background .15s,transform .15s}
 .penbtn svg{width:18px;height:18px}
@@ -2328,12 +2329,12 @@ function ledger(list, showProp=true){
   if (!list.length) return `<div class="empty"><p>No hi ha moviments. Escaneja una factura o anota un cobrament per començar.</p></div>`;
   const groups={}; list.forEach(x=>{ const k=ymOf(x.date); (groups[k]=groups[k]||[]).push(x); });
   return `<ul class="ledger">${Object.keys(groups).sort().reverse().map((k,gi)=>{ const g=groups[k], fk="lm-"+k, op=S.open.has(fk)||(gi===0&&!S.shut.has(fk));
-    const i=sum(g.filter(x=>x.type==="ingres")), o=sum(g.filter(x=>x.type==="despesa"));
+    const i=sum(g.filter(x=>x.type==="ingres"&&!passThru(x))), o=sum(g.filter(x=>x.type==="despesa"&&!passThru(x)));
     return `<li class="mgrp"><details class="fold mfold" data-fold="${fk}"${op?" open":""}><summary class="mh"><b>${monthName(k)} ${k.slice(0,4)}</b><span class="mcount">${g.length} moviment${g.length>1?"s":""}</span><span class="mtot">${i?`<span class="pos">+${eur(i)}</span>`:""}${i&&o?" · ":""}${o?`<span class="neg">−${eur(o)}</span>`:""}</span>${CHEV}</summary><ul class="ledger">` + g.map(x=>{ const p=propById(x.propId), c=conById(x.contractId);
       return `<li class="row" data-act="editMove" data-id="${x.id}">
         <span class="d">${fmtDate(x.date,false)}</span>
         <div class="c"><b>${esc(x.concept||x.provider||x.category)}</b><span>${esc([x.provider&&x.concept?x.provider:"", showProp?(p?p.name:"Sense pis"):"", c?shortName(c.tenantName):""].filter(Boolean).join(" · "))}</span></div>
-        <div class="a"><span class="num ${x.type==="ingres"?"pos":"neg"}">${x.type==="ingres"?"+":"−"}${eur(x.amount)}</span>
+        <div class="a">${passThru(x)?`<span class="num neu" title="No compta ni com a ingrés ni com a despesa">↔︎ ${eur(x.amount)}</span>`:`<span class="num ${x.type==="ingres"?"pos":"neg"}">${x.type==="ingres"?"+":"−"}${eur(x.amount)}</span>`}
           <span style="display:flex;gap:6px;align-items:center">${!x.propId?`<span class="chip warn">Sense pis</span>`:""}<span class="chip">${esc(x.category||"")}</span>${x.docId?`<button type="button" class="chip acc" style="border:0;cursor:pointer" data-doc="${esc(x.docId)}" data-mime="${esc(x.docMime||"")}" data-name="${esc(x.docName||x.concept||"")}">Doc</button>`:""}</span></div>
       </li>`; }).join("") + `</ul></details></li>`; }).join("")}</ul>`;
 }
@@ -2818,7 +2819,8 @@ function moveForm(m={}, o={}){
   openSheet(o.title || (m.id?"Editar moviment":o.ai?"Revisa i desa":"Nou moviment"), `<form class="form" id="f-move">
     ${o.note?`<div class="note ${o.warn?"warn":""}">${esc(o.note)}</div>`:""}
     ${fileBox}
-    <div class="seg" role="radiogroup" aria-label="Tipus" ${o.only?"hidden":""}>
+    ${m.id&&passThru(m)?`<div class="note neutral">↔︎ ${m.category===INV_CAT?"Llum o aigua refacturada a l'empresa":"Factura ja refacturada a l'empresa"}: <b>no compta ni com a ingrés ni com a despesa</b>, perquè l'empresa te la torna.</div>`:""}
+    <div class="seg" role="radiogroup" aria-label="Tipus" ${o.only||(m.id&&passThru(m))?"hidden":""}>
       <label><input type="radio" name="type" value="despesa" ${type==="despesa"?"checked":""}>Despesa</label>
       <label><input type="radio" name="type" value="ingres" ${type==="ingres"?"checked":""}>Ingrés</label></div>
     <div class="row2">${field("Data", `<input id="mf-date" type="date" name="date" required value="${esc(m.date||today())}">`)}${field("Import total (€)", amtIn("mf-amt","amount",m.amount,"0,00"))}</div>
