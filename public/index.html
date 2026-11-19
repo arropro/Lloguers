@@ -1790,6 +1790,8 @@ function passThru(x){
 
 const dmy = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return `${dd}/${m}/${y}`; };
 const eurInv = v => (Math.round(v*100)/100).toLocaleString("es-ES",{minimumFractionDigits:2,maximumFractionDigits:2});
+// Número de la factura següent: el més alt que ja tens + 1 (si n'esborres l'última, el número torna a quedar lliure).
+function invNextNo(p){ const nums=invList(p).map(x=>String(x.invNo||"")).filter(n=>/^\d+$/.test(n)).map(Number); return nums.length?String(Math.max(...nums)+1):String((p.inv&&p.inv.next)||""); }
 function invList(p){ return movesOf(p.id).filter(x=>x.category===INV_CAT).sort((a,b)=>String(b.date).localeCompare(a.date)); }
 function invRow(x, arch){
   const st= x.mailAt?`<span class="istat sch">🕒 Programada · ${esc(fmtDT(x.mailAt))}</span>`: x.mailErr?`<span class="istat err">⚠️ No s'ha pogut enviar</span>`: x.sentAt?`<span class="istat ok">✓ Enviada ${esc(fmtDT(x.sentAt))}${x.sentTo?" · "+esc(x.sentTo):""}</span>`:"";
@@ -1860,7 +1862,7 @@ async function invForm(pid){
     <div class="seg3" role="radiogroup" aria-label="Tipus"><label><input type="radio" name="kind" value="Luz" checked>💡 Llum</label><label><input type="radio" name="kind" value="AGUA">💧 Aigua</label></div>
     ${field("Import (€)", amtIn("i-amt","amt","","266,09"))}
     <div class="row2">${field("Període: des del", `<input type="date" name="from" value="${esc(I.lastTo||first)}" required>`)}${field("fins al", `<input type="date" name="to" value="${esc(td)}" required>`)}</div>
-    <div class="row2">${field("Número de factura", `<input name="no" inputmode="numeric" value="${esc(I.next||"")}" placeholder="p. ex. 22" required>`)}${field("Data de la factura", `<input type="date" name="date" value="${td}" required>`)}</div>
+    <div class="row2">${field("Número de factura", `<input name="no" inputmode="numeric" value="${esc(invNextNo(propById(pid)||p))}" placeholder="p. ex. 22" required>`)}${field("Data de la factura", `<input type="date" name="date" value="${td}" required>`)}</div>
     <p class="small muted">Per a: <b>${esc(c.tenantName||"")}</b>${c.cif?` · ${esc(c.cif)}`:""}</p>
     <details class="fold" ${(!c.tenantAddress||!I.emName||!I.emNif||!I.pl2)?"open":""}><summary>Dades de la factura ${(!c.tenantAddress||!I.emName||!I.emNif||!I.pl2)?"(en falta alguna, revisa-les)":"(revisar o canviar)"}</summary>
       ${field("Adreça de l'empresa", `<input name="caddr" value="${esc(c.tenantAddress||"")}" placeholder="España - Barcelona - Rambla Catalunya 73">`)}
@@ -3940,7 +3942,7 @@ function askDelProp(id){
     <div class="actions"><button type="button" class="btn" data-act="closeSheet">No, tornar</button><button type="button" class="btn danger" data-act="delProp" data-id="${p.id}" data-confirm="Toca per confirmar">Sí, esborrar-ho tot</button></div></div>`);
 }
 
-async function delMove(id){ const m=S.moves.find(x=>x.id===id); try{ await db.doc("moves/"+id).delete(); await delAsset(m&&m.docId); closeSheet(); toast("Moviment esborrat"); }catch{ toast("No s'ha pogut esborrar."); } }
+async function delMove(id){ const m=S.moves.find(x=>x.id===id); if(m&&m.category===INV_CAT){ closeSheet(); return ACT.invDel(id); } try{ await db.doc("moves/"+id).delete(); await delAsset(m&&m.docId); closeSheet(); toast("Moviment esborrat"); }catch{ toast("No s'ha pogut esborrar."); } }
 async function delDoc(id){ const d=S.docs.find(x=>x.id===id); try{ await db.doc("docs/"+id).delete(); await delAsset(d&&d.docId); toast("Document esborrat"); }catch{ toast("No s'ha pogut esborrar."); } }
 
 /* ================= events ================= */
